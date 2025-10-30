@@ -228,11 +228,10 @@ public:
     // Process messages
     rclcpp::Serialization<nebula_msgs::msg::NebulaPackets> nebula_serializer;
     rclcpp::Serialization<sensor_msgs::msg::PointCloud2> pc2_serializer;
-    
+
     size_t message_count = 0;
     size_t packets_processed = 0;
     size_t clouds_generated = 0;
-    size_t calibration_packets = 0;
     std::map<std::string, size_t> topic_conversion_counts;
     
     while (reader.has_next()) {
@@ -250,24 +249,24 @@ public:
         
         packets_processed++;
         topic_conversion_counts[bag_message->topic_name]++;
-        
+
         // Get decoder for this topic
         auto& decoder = decoders[bag_message->topic_name];
-        
+
         // Decode packets to point cloud directly using nebula_msgs
         auto nebula_cloud = decoder->ConvertNebulaPackets(nebula_msgs);
-        
+
         if (nebula_cloud && !nebula_cloud->empty()) {
           // Convert to PointCloud2 message
           sensor_msgs::msg::PointCloud2 pc2_msg;
-          
+
           // Nebula uses PointXYZIRCAEDT, need to convert
           pcl::PointCloud<pcl::PointXYZI> simple_cloud;
           simple_cloud.header = nebula_cloud->header;
           simple_cloud.width = nebula_cloud->width;
           simple_cloud.height = nebula_cloud->height;
           simple_cloud.is_dense = nebula_cloud->is_dense;
-          
+
           for (const auto& pt : nebula_cloud->points) {
             pcl::PointXYZI simple_pt;
             simple_pt.x = pt.x;
@@ -276,45 +275,32 @@ public:
             simple_pt.intensity = pt.intensity;
             simple_cloud.push_back(simple_pt);
           }
-          
+
           pcl::toROSMsg(simple_cloud, pc2_msg);
-          
+
           // Set header
-          pc2_msg.header.stamp.sec = bag_message->time_stamp / 1000000000;
-          pc2_msg.header.stamp.nanosec = bag_message->time_stamp % 1000000000;
-          pc2_msg.header.frame_id = nebula_msgs.header.frame_id.empty() ? 
+          uint64_t timestamp_us = nebula_cloud->header.stamp;
+          pc2_msg.header.stamp.sec = timestamp_us / 1000000;
+          pc2_msg.header.stamp.nanosec = (timestamp_us % 1000000) * 1000;
+          pc2_msg.header.frame_id = nebula_msgs.header.frame_id.empty() ?
                                      decoder->GetConfig().frame_id : nebula_msgs.header.frame_id;
-          
+
           // Serialize and write to bag
           auto serialized_pc2 = std::make_shared<rclcpp::SerializedMessage>();
           pc2_serializer.serialize_message(&pc2_msg, serialized_pc2.get());
-          
+
           // Write to bag file using the same pattern as seyond_bag_decoder.cpp
           writer.write(
             serialized_pc2,
             it->second,  // Use mapped output topic name
             "sensor_msgs/msg/PointCloud2",
             rclcpp::Time(bag_message->time_stamp));
-          
+
           clouds_generated++;
-          
+
           if (config_.verbose && clouds_generated % 10 == 0) {
             std::cout << "Generated " << clouds_generated << " point clouds from "
                       << packets_processed << " packet messages" << std::endl;
-          }
-        }
-        
-        // Check for calibration packets
-        for (const auto& packet : nebula_msgs.packets) {
-          if (packet.data.size() > 40) {
-            uint8_t type_byte = packet.data[38];
-            if (type_byte == 100) {
-              calibration_packets++;
-              if (calibration_packets == 1) {
-                std::cout << "Found calibration packet in nebula data" << std::endl;
-                decoder->SetCalibrationData(packet.data);
-              }
-            }
           }
         }
       } else {
@@ -332,7 +318,6 @@ public:
     std::cout << "Total messages processed: " << message_count << std::endl;
     std::cout << "Total Nebula packets processed: " << packets_processed << std::endl;
     std::cout << "Total point clouds generated: " << clouds_generated << std::endl;
-    std::cout << "Calibration packets found: " << calibration_packets << std::endl;
     
     if (!topic_conversion_counts.empty()) {
       std::cout << "\nConversion details by topic:" << std::endl;

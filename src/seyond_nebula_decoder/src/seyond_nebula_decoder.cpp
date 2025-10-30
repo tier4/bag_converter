@@ -143,17 +143,25 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
 {
   nebula::drivers::NebulaPointCloudPtr complete_cloud;
   nebula::drivers::NebulaPointCloudPtr accumulated_cloud;
-  
+  double scan_timestamp_s = 0.0;
+
   for (const auto& packet : packets) {
     auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet);
-    
+
     if (cloud && !cloud->empty()) {
       // A complete scan was returned
       complete_cloud = cloud;
+      scan_timestamp_s = cloud_timestamp;  // Capture timestamp parsed from packet data
       accumulated_cloud.reset();  // Reset accumulation for next scan
     }
   }
-  
+
+  // Set the timestamp in the point cloud header
+  if (complete_cloud && scan_timestamp_s > 0.0) {
+    // Convert seconds to microseconds (PCL header.stamp is in microseconds)
+    complete_cloud->header.stamp = static_cast<uint64_t>(scan_timestamp_s * 1e6);
+  }
+
   // Return the last complete cloud if available
   return complete_cloud;
 }

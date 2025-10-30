@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>nebula_decoder</name>
+  <version>0.1.0</version>
+  <description>ROS2 node for decoding Nebula packets to point clouds using Seyond LiDAR decoder</description>
+  <maintainer email="your_email@example.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>nebula_msgs</depend>
+  <depend>seyond_nebula_decoder</depend>
+  <depend>libpcl-all-dev</depend>
+  <depend>pcl_conversions</depend>
+  <depend>eigen</depend>
+  <depend>nebula_decoders</depend>
+  <depend>nebula_common</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
