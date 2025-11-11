@@ -6,10 +6,13 @@ bag_convert
 ```shell
 # clone repository
 git clone https://github.com/tier4/bag_converter.git
-cd bag_converter
+
 # clone dependencies
+cd bag_converter
 vcs src < repos.yaml
+
 # build
+cd docker
 ./build.sh
 ```
 
