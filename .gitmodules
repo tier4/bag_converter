@@ -1,6 +1,0 @@
-[submodule "src/seyond_decoder/src/seyond_sdk"]
-	path = src/seyond_decoder/src/seyond_sdk
-	url = https://github.com/Seyond-Inc/inno-lidar-sdk.git
-[submodule "src/nebula_drs"]
-	path = src/nebula_drs
-	url = https://github.com/tier4/nebula_drs.git

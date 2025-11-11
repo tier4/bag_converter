@@ -4,9 +4,15 @@ bag_convert
 
 # Install
 ```shell
-# setup
-git clone --recurse-submodules https://github.com/tier4/bag_converter.git
-cd bag_converter/docker
+# clone repository
+git clone https://github.com/tier4/bag_converter.git
+
+# clone dependencies
+cd bag_converter
+vcs import src < repos.yaml
+
+# build
+cd docker
 ./build.sh
 ```
 

@@ -1,0 +1,9 @@
+repositories:
+  nebula_drs:
+    type: git
+    url: https://github.com/tier4/nebula_drs.git
+    version: 7081f40b32341d8d82ef00dee20b856e4283d4e9  # aeva_seyond
+  seyond_decoder/src/seyond_sdk:
+    type: git
+    url: https://github.com/Seyond-Inc/inno-lidar-sdk.git
+    version: e7e40ca635605447dbf8d73735706aee56b13f70  # main
