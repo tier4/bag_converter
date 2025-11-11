@@ -7,3 +7,7 @@ repositories:
     type: git
     url: https://github.com/Seyond-Inc/inno-lidar-sdk.git
     version: e7e40ca635605447dbf8d73735706aee56b13f70  # main
+  oxts_ros2_driver:
+    type: git
+    url: https://github.com/tier4/oxts_ros2_driver.git
+    version: 022d160e13e378bdfe34e5222a0e89f3a51cf081  # feat/data_recording_system
