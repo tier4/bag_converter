@@ -14,6 +14,9 @@ vcs import src < repos.yaml
 # build
 cd docker
 ./build.sh
+
+# clean build
+./build.sh --no-cache
 ```
 
 
