@@ -9,9 +9,9 @@
 # colcon
 build/
 install/
-log/a
+log/
 
 # Dependencies
-./src/nebula_drs/
-./src/seyond_decoder/src/seyond_sdk/
+/src/nebula_drs/
+/src/seyond_decoder/src/seyond_sdk/
 
