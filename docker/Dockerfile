@@ -81,7 +81,7 @@ RUN rosdep init && \
 
 # Build ROS packages
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
-    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --packages-up-to bag_manipulate oxts_msgs
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to bag_manipulate oxts_msgs
 
 # Set env var
 ENV ROS_DISTRO=${ROS_DISTRO}
