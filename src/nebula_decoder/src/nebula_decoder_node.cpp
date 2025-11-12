@@ -33,14 +33,12 @@ NebulaDecoderNode::NebulaDecoderNode(const rclcpp::NodeOptions & options)
   decoder_ = std::make_unique<seyond_nebula_decoder::SeyondNebulaDecoder>(config);
 
   // Create publisher
-  points_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    "~/nebula_points",
-    rclcpp::QoS(10));
+  points_pub_ =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("~/nebula_points", rclcpp::QoS(10));
 
   // Create subscriber with sensor QoS
   packets_sub_ = this->create_subscription<nebula_msgs::msg::NebulaPackets>(
-    "~/nebula_packets",
-    rclcpp::SensorDataQoS(),
+    "~/nebula_packets", rclcpp::SensorDataQoS(),
     std::bind(&NebulaDecoderNode::packetsCallback, this, std::placeholders::_1));
 
   RCLCPP_INFO(this->get_logger(), "Nebula Decoder Node initialized");
@@ -53,7 +51,7 @@ NebulaDecoderNode::NebulaDecoderNode(const rclcpp::NodeOptions & options)
 void NebulaDecoderNode::packetsCallback(const nebula_msgs::msg::NebulaPackets::SharedPtr msg)
 {
   // Process each packet individually to handle scan completion
-  for (const auto& packet : msg->packets) {
+  for (const auto & packet : msg->packets) {
     auto [cloud, scan_complete] = decoder_->ProcessPacket(packet.data);
 
     // Publish when scan is complete
@@ -62,17 +60,13 @@ void NebulaDecoderNode::packetsCallback(const nebula_msgs::msg::NebulaPackets::S
       auto pc2_msg = convertToPointCloud2(cloud, msg->header);
       points_pub_->publish(pc2_msg);
 
-      RCLCPP_DEBUG(
-        this->get_logger(),
-        "Published point cloud with %zu points",
-        cloud->size());
+      RCLCPP_DEBUG(this->get_logger(), "Published point cloud with %zu points", cloud->size());
     }
   }
 }
 
 sensor_msgs::msg::PointCloud2 NebulaDecoderNode::convertToPointCloud2(
-  const nebula::drivers::NebulaPointCloudPtr& nebula_cloud,
-  const std_msgs::msg::Header& header)
+  const nebula::drivers::NebulaPointCloudPtr & nebula_cloud, const std_msgs::msg::Header & header)
 {
   sensor_msgs::msg::PointCloud2 output;
 

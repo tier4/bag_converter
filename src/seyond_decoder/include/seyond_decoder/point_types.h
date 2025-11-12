@@ -10,9 +10,11 @@
 
 #include <pcl/point_types.h>
 
-namespace seyond {
+namespace seyond
+{
 
-struct EIGEN_ALIGN16 PointXYZIT {
+struct EIGEN_ALIGN16 PointXYZIT
+{
   PCL_ADD_POINT4D;
   float intensity;
   double timestamp;
@@ -22,9 +24,6 @@ struct EIGEN_ALIGN16 PointXYZIT {
 }  // namespace seyond
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
-    seyond::PointXYZIT,
-    (float, x, x)
-    (float, y, y)
-    (float, z, z)
-    (float, intensity, intensity)
-    (double, timestamp, timestamp))
+  seyond::PointXYZIT,
+  (float, x,
+   x)(float, y, y)(float, z, z)(float, intensity, intensity)(double, timestamp, timestamp))

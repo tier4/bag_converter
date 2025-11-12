@@ -4,6 +4,7 @@
 #include "seyond_nebula_decoder/seyond_nebula_decoder.hpp"
 
 #include <rclcpp/rclcpp.hpp>
+
 #include <nebula_msgs/msg/nebula_packets.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
@@ -24,8 +25,8 @@ private:
   void packetsCallback(const nebula_msgs::msg::NebulaPackets::SharedPtr msg);
 
   sensor_msgs::msg::PointCloud2 convertToPointCloud2(
-    const nebula::drivers::NebulaPointCloudPtr& nebula_cloud,
-    const std_msgs::msg::Header& header);
+    const nebula::drivers::NebulaPointCloudPtr & nebula_cloud,
+    const std_msgs::msg::Header & header);
 
   // Decoder
   std::unique_ptr<seyond_nebula_decoder::SeyondNebulaDecoder> decoder_;
