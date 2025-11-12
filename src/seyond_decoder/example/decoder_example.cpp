@@ -6,15 +6,20 @@
  *  Example program demonstrating the use of SeyondDecoder library
  */
 
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
 #include "seyond_decoder/msg/seyond_scan.hpp"
 #include "seyond_decoder/seyond_decoder.hpp"
+
+#include <rclcpp/rclcpp.hpp>
+
+#include <sensor_msgs/msg/point_cloud2.hpp>
+
 #include <chrono>
 
-class SeyondDecoderExample : public rclcpp::Node {
+class SeyondDecoderExample : public rclcpp::Node
+{
 public:
-  SeyondDecoderExample() : Node("seyond_decoder_example") {
+  SeyondDecoderExample() : Node("seyond_decoder_example")
+  {
     // Configure decoder
     seyond::DecoderConfig config;
     config.max_range = this->declare_parameter<double>("max_range", 200.0);
@@ -22,19 +27,18 @@ public:
     config.coordinate_mode = this->declare_parameter<int>("coordinate_mode", 0);
     config.use_reflectance = this->declare_parameter<bool>("use_reflectance", true);
     config.frame_id = this->declare_parameter<std::string>("frame_id", "lidar");
-    
+
     decoder_ = std::make_unique<seyond::SeyondDecoder>(config);
-    
+
     // Create subscriber for SeyondScan messages
     std::string input_topic = this->declare_parameter<std::string>("input_topic", "/seyond_scan");
     scan_sub_ = this->create_subscription<seyond_decoder::msg::SeyondScan>(
-      input_topic, 10,
-      std::bind(&SeyondDecoderExample::scanCallback, this, std::placeholders::_1));
-    
+      input_topic, 10, std::bind(&SeyondDecoderExample::scanCallback, this, std::placeholders::_1));
+
     // Create publisher for PointCloud2 messages
     std::string output_topic = this->declare_parameter<std::string>("output_topic", "/pointcloud");
     pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(output_topic, 10);
-    
+
     RCLCPP_INFO(this->get_logger(), "SeyondDecoder example started");
     RCLCPP_INFO(this->get_logger(), "Subscribing to: %s", input_topic.c_str());
     RCLCPP_INFO(this->get_logger(), "Publishing to: %s", output_topic.c_str());
@@ -42,26 +46,28 @@ public:
     RCLCPP_INFO(this->get_logger(), "  - max_range: %.2f", config.max_range);
     RCLCPP_INFO(this->get_logger(), "  - min_range: %.2f", config.min_range);
     RCLCPP_INFO(this->get_logger(), "  - coordinate_mode: %d", config.coordinate_mode);
-    RCLCPP_INFO(this->get_logger(), "  - use_reflectance: %s", config.use_reflectance ? "true" : "false");
+    RCLCPP_INFO(
+      this->get_logger(), "  - use_reflectance: %s", config.use_reflectance ? "true" : "false");
     RCLCPP_INFO(this->get_logger(), "  - frame_id: %s", config.frame_id.c_str());
   }
 
 private:
-  void scanCallback(const seyond_decoder::msg::SeyondScan::SharedPtr msg) {
+  void scanCallback(const seyond_decoder::msg::SeyondScan::SharedPtr msg)
+  {
     auto start = std::chrono::high_resolution_clock::now();
-    
+
     // Convert SeyondScan to PointCloud2
     auto pointcloud_msg = decoder_->convert(msg);
-    
+
     if (pointcloud_msg) {
       // Publish the converted point cloud
       pointcloud_pub_->publish(*pointcloud_msg);
-      
+
       auto end = std::chrono::high_resolution_clock::now();
       auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-      
+
       RCLCPP_DEBUG(this->get_logger(), "Conversion took %ld microseconds", duration.count());
-      
+
       // Log statistics periodically
       message_count_++;
       if (message_count_ % 100 == 0) {
@@ -78,7 +84,8 @@ private:
   size_t message_count_ = 0;
 };
 
-int main(int argc, char** argv) {
+int main(int argc, char ** argv)
+{
   rclcpp::init(argc, argv);
   auto node = std::make_shared<SeyondDecoderExample>();
   rclcpp::spin(node);
