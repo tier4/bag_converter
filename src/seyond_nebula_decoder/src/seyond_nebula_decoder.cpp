@@ -141,7 +141,6 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
   const std::vector<std::vector<uint8_t>> & packets)
 {
   nebula::drivers::NebulaPointCloudPtr complete_cloud;
-  nebula::drivers::NebulaPointCloudPtr accumulated_cloud;
   double scan_timestamp_s = 0.0;
 
   for (const auto & packet : packets) {
@@ -151,7 +150,6 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
       // A complete scan was returned
       complete_cloud = cloud;
       scan_timestamp_s = cloud_timestamp;  // Capture timestamp parsed from packet data
-      accumulated_cloud.reset();           // Reset accumulation for next scan
     }
   }
 
