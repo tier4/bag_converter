@@ -31,25 +31,39 @@ class SeyondCalibrationConfiguration;
 namespace seyond_nebula_decoder
 {
 
+// Default configuration constants
+namespace defaults
+{
+inline constexpr const char * sensor_model = "Falcon_Kinetic";
+inline constexpr const char * return_mode = "Dual";
+inline constexpr const char * frame_id = "seyond";
+inline constexpr double min_range = 0.3;
+inline constexpr double max_range = 200.0;
+inline constexpr double scan_phase = 0.0;
+inline constexpr double frequency_ms = 100.0;
+inline constexpr bool use_sensor_time = true;
+inline constexpr const char * calibration_file = "";
+}  // namespace defaults
+
 // Configuration for the decoder
 struct DecoderConfig
 {
   // Sensor configuration
-  std::string sensor_model = "Falcon_Kinetic";  // or "Robin_W"
-  std::string return_mode = "Dual";
-  std::string frame_id = "seyond";
+  std::string sensor_model = defaults::sensor_model;  // or "Robin_W"
+  std::string return_mode = defaults::return_mode;
+  std::string frame_id = defaults::frame_id;
 
   // Range filtering (will be set in sensor config)
-  double min_range = 0.3;
-  double max_range = 200.0;
+  double min_range = defaults::min_range;
+  double max_range = defaults::max_range;
 
   // Processing options
-  double scan_phase = 0.0;
-  double frequency_ms = 100.0;
-  bool use_sensor_time = true;
+  double scan_phase = defaults::scan_phase;
+  double frequency_ms = defaults::frequency_ms;
+  bool use_sensor_time = defaults::use_sensor_time;
 
   // Calibration
-  std::string calibration_file = "";
+  std::string calibration_file = defaults::calibration_file;
 };
 
 /// @brief Decoder class using actual nebula driver like seyond_rosbag_to_pcd
@@ -62,10 +76,9 @@ public:
 
   /// @brief Process single packet (for streaming processing) - main interface
   /// @param packet_data Raw packet bytes
-  /// @param timestamp Timestamp in seconds (not used by driver)
   /// @return Tuple of (complete_cloud, scan_complete_flag)
   std::tuple<nebula::drivers::NebulaPointCloudPtr, bool> ProcessPacket(
-    const std::vector<uint8_t> & packet_data, double timestamp = 0.0);
+    const std::vector<uint8_t> & packet_data);
 
   /// @brief Process multiple packets at once
   /// @param packets Vector of packet data

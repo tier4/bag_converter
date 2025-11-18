@@ -27,7 +27,7 @@ SeyondNebulaDecoder::SeyondNebulaDecoder(const DecoderConfig & config) : config_
   // Set other parameters
   sensor_config_->frame_id = config.frame_id;
   sensor_config_->scan_phase = config.scan_phase;
-  sensor_config_->frequency_ms = config.frequency_ms;
+  sensor_config_->frequency_ms = static_cast<uint16_t>(config.frequency_ms);
   sensor_config_->use_sensor_time = config.use_sensor_time;
 
   // Set min/max range
@@ -39,40 +39,31 @@ SeyondNebulaDecoder::SeyondNebulaDecoder(const DecoderConfig & config) : config_
 
   // Load calibration from file if provided
   if (!config.calibration_file.empty()) {
-    std::cerr
-      << "Warning: Calibration file loading not yet implemented, using default calibration\n";
+    std::cerr << "Calibration file loading not yet implemented, using default calibration "
+                 "settings..."
+              << std::endl;
   }
 
   // Initialize the driver
   try {
     driver_ = std::make_shared<nebula::drivers::SeyondDriver>(sensor_config_, calibration_config_);
-    // Note: SeyondDriver doesn't initialize driver_status_ in constructor
-    // We need to assume it's OK if no exception was thrown
     status_ = nebula::Status::OK;
 
     // Check actual driver status
     auto driver_status = driver_->GetStatus();
     if (driver_status != nebula::Status::OK) {
-      std::cerr << "Warning: Driver status is not OK\n";
-      // Continue anyway as the driver might still work for offline processing
+      std::cerr << "Driver status is not OK (error code: " << driver_status << ")" << std::endl;
     }
   } catch (const std::exception & e) {
     std::cerr << "Failed to initialize driver: " << e.what() << "\n";
     status_ = nebula::Status::SENSOR_CONFIG_ERROR;
   }
-
-  std::cout << "Initialized Seyond Nebula Decoder:\n"
-            << "  Sensor Model: " << config_.sensor_model << "\n"
-            << "  Return Mode: " << config_.return_mode << "\n"
-            << "  Frame ID: " << config_.frame_id << "\n"
-            << "  Min Range: " << config_.min_range << " m\n"
-            << "  Max Range: " << config_.max_range << " m\n";
 }
 
 SeyondNebulaDecoder::~SeyondNebulaDecoder() = default;
 
 std::tuple<nebula::drivers::NebulaPointCloudPtr, bool> SeyondNebulaDecoder::ProcessPacket(
-  const std::vector<uint8_t> & packet_data, double /* timestamp */)
+  const std::vector<uint8_t> & packet_data)
 {
   if (status_ != nebula::Status::OK) {
     std::cerr << "Driver status not OK\n";
@@ -228,7 +219,7 @@ void SeyondNebulaDecoder::SetConfig(const DecoderConfig & config)
   sensor_config_->return_mode = nebula::drivers::ReturnModeFromString(config.return_mode);
   sensor_config_->frame_id = config.frame_id;
   sensor_config_->scan_phase = config.scan_phase;
-  sensor_config_->frequency_ms = config.frequency_ms;
+  sensor_config_->frequency_ms = static_cast<uint16_t>(config.frequency_ms);
   sensor_config_->use_sensor_time = config.use_sensor_time;
   sensor_config_->min_range = config.min_range;
   sensor_config_->max_range = config.max_range;
