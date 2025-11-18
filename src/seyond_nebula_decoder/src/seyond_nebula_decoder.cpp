@@ -1,5 +1,6 @@
 #include "seyond_nebula_decoder/seyond_nebula_decoder.hpp"
 
+#include <nebula_decoders/nebula_decoders_seyond/decoders/seyond_packet.hpp>
 #include <nebula_decoders/nebula_decoders_seyond/seyond_driver.hpp>
 
 #include <iomanip>
@@ -63,68 +64,40 @@ SeyondNebulaDecoder::SeyondNebulaDecoder(const DecoderConfig & config) : config_
 SeyondNebulaDecoder::~SeyondNebulaDecoder() = default;
 
 std::tuple<nebula::drivers::NebulaPointCloudPtr, bool> SeyondNebulaDecoder::ProcessPacket(
-  const std::vector<uint8_t> & packet_data)
+  const std::vector<uint8_t> & packet)
 {
   if (status_ != nebula::Status::OK) {
-    std::cerr << "Driver status not OK\n";
+    std::cerr << "Driver status not OK (error code: " << status_ << ")" << std::endl;
     return {nullptr, false};
   }
 
   // Process the packet - the driver returns a cloud when scan is complete
-  auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet_data);
+  auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet);
 
-  // Debug: print packet info for RobinW
-  if (packet_data.size() > 40) {
-    uint8_t type_byte = packet_data[38];
+  const auto packet_decoded =
+    reinterpret_cast<const nebula::drivers::seyond_packet::SeyondDataPacket *>(packet.data());
 
+  if (packet.size() >= 42) {  // Needs 42 bytes to decode "type" field
     // Check for calibration packet (type 100)
-    if (type_byte == 100) {
-      calibration_packets_seen_++;
-      if (calibration_packets_seen_ == 1) {
-        std::cout << "Found RobinW calibration packet (type 100)\n";
-      }
-
-      // Store calibration packet if we don't have one yet
-      if (!has_calibration_from_packet_/* && 
-          (config_.sensor_model == "Robin_W" || config_.sensor_model == "SEYOND_ROBIN_W")*/) {
+    if (
+      packet_decoded->type ==
+      nebula::drivers::seyond_packet::SEYOND_ROBINW_ITEM_TYPE_ANGLEHV_TABLE) {
+      if (!has_calibration_from_packet_) {
         has_calibration_from_packet_ = true;
-        stored_calibration_packet_ = packet_data;
 
         // Apply the calibration data
-        std::cout << "Applying calibration from packet (" << packet_data.size() << " bytes)\n";
-        SetCalibrationData(packet_data);
+        std::cout << "Applying calibration from packet (" << packet.size() << " bytes)\n";
+        SetCalibrationData(packet);
         std::cout << "Calibration applied successfully\n";
       }
     }
-
-    if (!first_packet_logged_) {
-      first_packet_logged_ = true;
-
-      // Also check first few bytes for magic number
-      uint16_t magic = *reinterpret_cast<const uint16_t *>(packet_data.data());
-
-      std::cout << "First packet info:\n"
-                << "  Size: " << packet_data.size() << " bytes\n"
-                << "  Magic (first 2 bytes): 0x" << std::hex << magic << std::dec << "\n"
-                << "  Type byte at offset 38: " << (int)type_byte << "\n";
-
-      // For RobinW, check if this is a calibration packet
-      if (type_byte == 100) {
-        std::cout << "  --> This is a RobinW calibration packet (ANGLEHV_TABLE)\n";
-      } else if (type_byte == 13) {
-        std::cout << "  --> This is a RobinW compact data packet\n";
-      } else if (type_byte == 10 || type_byte == 11) {
-        std::cout << "  --> This is a RobinW sphere pointcloud packet\n";
-      }
-    }
   }
 
-  // Check if a complete scan is available (ParseCloudPacket returns non-null cloud when scan is
-  // complete)
+  // Check if a complete scan is available
+  // (ParseCloudPacket returns non-null cloud when scan is complete)
   if (cloud != nullptr) {
     return {cloud, true};
   }
-
   return {nullptr, false};
 }
 
@@ -171,8 +144,6 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ConvertNebulaPackets(
 void SeyondNebulaDecoder::Reset()
 {
   packet_buffer_.clear();
-  first_packet_logged_ = false;
-  calibration_packets_seen_ = 0;
 }
 
 void SeyondNebulaDecoder::ReinitializeDriver()
