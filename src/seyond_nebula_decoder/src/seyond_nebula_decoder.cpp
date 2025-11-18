@@ -86,7 +86,7 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
   const std::vector<std::vector<uint8_t>> & packets)
 {
   nebula::drivers::NebulaPointCloudPtr complete_cloud;
-  double scan_timestamp_s = 0.0;
+  double scan_timestamp_s = 0;
 
   for (const auto & packet : packets) {
     auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet);
@@ -94,14 +94,16 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
     if (cloud && !cloud->empty()) {
       // A complete scan was returned
       complete_cloud = cloud;
-      scan_timestamp_s = cloud_timestamp;  // Capture timestamp parsed from packet data
+      scan_timestamp_s = cloud_timestamp;
     }
   }
 
   // Set the timestamp in the point cloud header
-  if (complete_cloud && scan_timestamp_s > 0.0) {
+  if (complete_cloud && scan_timestamp_s > 0) {
     // Convert seconds to microseconds (PCL header.stamp is in microseconds)
     complete_cloud->header.stamp = static_cast<uint64_t>(scan_timestamp_s * 1e6);
+  } else {
+    std::cerr << "An incomplete scan was detected (skipped)" << std::endl;
   }
 
   // Return the last complete cloud if available
