@@ -92,9 +92,6 @@ public:
   nebula::drivers::NebulaPointCloudPtr ConvertNebulaPackets(
     const nebula_msgs::msg::NebulaPackets & packets);
 
-  /// @brief Reset decoder state
-  void Reset();
-
   /// @brief Reinitialize driver (useful for error recovery)
   void ReinitializeDriver();
 
@@ -116,12 +113,6 @@ private:
   std::shared_ptr<nebula::drivers::SeyondDriver> driver_;
   std::shared_ptr<nebula::drivers::SeyondSensorConfiguration> sensor_config_;
   std::shared_ptr<nebula::drivers::SeyondCalibrationConfiguration> calibration_config_;
-
-  // Buffer for partial packets if needed
-  std::vector<std::vector<uint8_t>> packet_buffer_;
-
-  // Calibration data storage (for RobinW)
-  bool has_calibration_from_packet_ = false;
 };
 
 }  // namespace seyond_nebula_decoder

@@ -74,25 +74,6 @@ std::tuple<nebula::drivers::NebulaPointCloudPtr, bool> SeyondNebulaDecoder::Proc
   // Process the packet - the driver returns a cloud when scan is complete
   auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet);
 
-  const auto packet_decoded =
-    reinterpret_cast<const nebula::drivers::seyond_packet::SeyondDataPacket *>(packet.data());
-
-  if (packet.size() >= 42) {  // Needs 42 bytes to decode "type" field
-    // Check for calibration packet (type 100)
-    if (
-      packet_decoded->type ==
-      nebula::drivers::seyond_packet::SEYOND_ROBINW_ITEM_TYPE_ANGLEHV_TABLE) {
-      if (!has_calibration_from_packet_) {
-        has_calibration_from_packet_ = true;
-
-        // Apply the calibration data
-        std::cout << "Applying calibration from packet (" << packet.size() << " bytes)\n";
-        SetCalibrationData(packet);
-        std::cout << "Calibration applied successfully\n";
-      }
-    }
-  }
-
   // Check if a complete scan is available
   // (ParseCloudPacket returns non-null cloud when scan is complete)
   if (cloud != nullptr) {
@@ -139,11 +120,6 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ConvertNebulaPackets(
 
   // Process all packets
   return ProcessPackets(packet_data_vec);
-}
-
-void SeyondNebulaDecoder::Reset()
-{
-  packet_buffer_.clear();
 }
 
 void SeyondNebulaDecoder::ReinitializeDriver()
