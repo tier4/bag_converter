@@ -124,41 +124,6 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ConvertNebulaPackets(
   return ProcessPackets(packet_data_vec);
 }
 
-void SeyondNebulaDecoder::ReinitializeDriver()
-{
-  // Reinitialize the driver with the same configuration
-  try {
-    driver_ = std::make_shared<nebula::drivers::SeyondDriver>(sensor_config_, calibration_config_);
-    status_ = driver_->GetStatus();
-  } catch (const std::exception & e) {
-    std::cerr << "Failed to reinitialize driver: " << e.what() << "\n";
-    status_ = nebula::Status::SENSOR_CONFIG_ERROR;
-  }
-}
-
-void SeyondNebulaDecoder::SetCalibrationData(const std::vector<uint8_t> & calibration_data)
-{
-  // For RobinW, the calibration packet contains the full AngleHV table
-  // We need to pass this to the driver in the format it expects
-
-  // Convert vector to string (the driver expects this format)
-  std::string calib_string(calibration_data.begin(), calibration_data.end());
-
-  // Create new calibration configuration
-  auto new_calibration_config = std::make_shared<nebula::drivers::SeyondCalibrationConfiguration>();
-
-  // Load the calibration string directly - the driver will parse it
-  new_calibration_config->LoadFromString(calib_string);
-
-  // Store the calibration configuration
-  calibration_config_ = new_calibration_config;
-
-  // Reinitialize driver with new calibration
-  ReinitializeDriver();
-
-  std::cout << "Calibration data set (" << calibration_data.size() << " bytes)\n";
-}
-
 void SeyondNebulaDecoder::SetConfig(const DecoderConfig & config)
 {
   config_ = config;
@@ -172,9 +137,6 @@ void SeyondNebulaDecoder::SetConfig(const DecoderConfig & config)
   sensor_config_->use_sensor_time = config.use_sensor_time;
   sensor_config_->min_range = config.min_range;
   sensor_config_->max_range = config.max_range;
-
-  // Reinitialize driver with new configuration
-  ReinitializeDriver();
 }
 
 }  // namespace seyond_nebula_decoder

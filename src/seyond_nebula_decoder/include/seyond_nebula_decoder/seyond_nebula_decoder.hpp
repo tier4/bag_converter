@@ -92,12 +92,6 @@ public:
   nebula::drivers::NebulaPointCloudPtr ConvertNebulaPackets(
     const nebula_msgs::msg::NebulaPackets & packets);
 
-  /// @brief Reinitialize driver (useful for error recovery)
-  void ReinitializeDriver();
-
-  /// @brief Set calibration data
-  void SetCalibrationData(const std::vector<uint8_t> & calibration_data);
-
   /// @brief Get current status
   nebula::Status GetStatus() const { return status_; }
 
