@@ -179,12 +179,7 @@ public:
         // Don't keep the original nebula packets topic (replaced by pointcloud)
       } else {
         // Not a nebula topic, copy as-is
-        rosbag2_storage::TopicMetadata new_topic_metadata;
-        new_topic_metadata.name = topic_metadata.name;
-        new_topic_metadata.type = topic_metadata.type;
-        new_topic_metadata.serialization_format = topic_metadata.serialization_format;
-        new_topic_metadata.offered_qos_profiles = topic_metadata.offered_qos_profiles;
-        writer.create_topic(new_topic_metadata);
+        writer.create_topic(topic_metadata);
       }
     }
 
