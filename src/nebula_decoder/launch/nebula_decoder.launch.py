@@ -11,7 +11,7 @@ def generate_launch_description():
     sensor_model_arg = DeclareLaunchArgument(
         'sensor_model',
         default_value='Robin_W',
-        description='Sensor model (e.g., Robin_W, Falcon_Kinetic)'
+        description='Sensor model (e.g., Robin_W, Falcon)'
     )
 
     return_mode_arg = DeclareLaunchArgument(

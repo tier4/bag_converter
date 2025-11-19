@@ -37,7 +37,7 @@ public:
     std::string pointcloud_topic = "";      // Empty = auto-generate from input topic
 
     // Decoder configuration
-    std::string sensor_model = "Falcon_Kinetic";
+    std::string sensor_model = "Falcon";
     std::string return_mode = "Dual";
     std::string frame_id = "lidar_top";
     double min_range = 0.3;
@@ -351,7 +351,7 @@ int main(int argc, char ** argv)
       << "  --nebula-topic <topic>  : Specific nebula packets topic (auto-detects if not "
          "specified)\n"
       << "  --output-topic <topic>  : Output pointcloud topic (auto-generates if not specified)\n"
-      << "  --sensor-model <model>  : Sensor model (default: Falcon_Kinetic)\n"
+      << "  --sensor-model <model>  : Sensor model (default: Falcon)\n"
       << "  --return-mode <mode>    : Return mode (default: Dual)\n"
       << "  --frame-id <id>         : Frame ID (default: lidar_top)\n"
       << "  --min-range <meters>    : Minimum range (default: 0.3)\n"

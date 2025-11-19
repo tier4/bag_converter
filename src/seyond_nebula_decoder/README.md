@@ -33,7 +33,7 @@ colcon build --packages-select seyond_nebula_decoder
 
 // Create decoder with configuration
 seyond_nebula_decoder::DecoderConfig config;
-config.sensor_model = "Falcon_Kinetic";
+config.sensor_model = "Falcon";
 config.return_mode = "Dual";
 config.min_range = 0.1;
 config.max_range = 300.0;
@@ -68,7 +68,7 @@ auto cloud = decoder->DecodePackets(nebula_packets);
 
 The `DecoderConfig` structure supports the following parameters:
 
-- `sensor_model` (string, default: "Falcon_Kinetic"): Sensor model
+- `sensor_model` (string, default: "Falcon"): Sensor model
 - `return_mode` (string, default: "Dual"): Return mode (Single/Dual)
 - `frame_id` (string, default: "seyond"): Frame ID for identification
 - `scan_phase` (double, default: 0.0): Scan phase offset

@@ -34,7 +34,7 @@ namespace seyond_nebula_decoder
 // Default configuration constants
 namespace defaults
 {
-inline constexpr const char * sensor_model = "Falcon_Kinetic";
+inline constexpr const char * sensor_model = "Falcon";
 inline constexpr const char * return_mode = "Dual";
 inline constexpr const char * frame_id = "seyond";
 inline constexpr double min_range = 0.3;
