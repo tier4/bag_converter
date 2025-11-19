@@ -58,6 +58,7 @@ public:
     int coordinate_mode = 3;
     bool use_reflectance = true;
     std::string calibration_file;
+    bool keep_original_topics = false;
   };
 
   explicit SeyondNebulaBagDecoder(Config config) : config_(std::move(config)) {}
@@ -176,7 +177,10 @@ public:
         pointcloud_topic_meta.serialization_format = "cdr";
         writer.create_topic(pointcloud_topic_meta);
 
-        // Don't keep the original nebula packets topic (replaced by pointcloud)
+        // Keep original nebula packets topic if requested
+        if (config_.keep_original_topics) {
+          writer.create_topic(topic_metadata);
+        }
       } else {
         // Not a nebula topic, copy as-is
         writer.create_topic(topic_metadata);
@@ -199,6 +203,11 @@ public:
         // Write other messages as-is and continue
         writer.write(bag_message);
         continue;
+      }
+
+      // Write original nebula packets message if requested
+      if (config_.keep_original_topics) {
+        writer.write(bag_message);
       }
 
       // Deserialize message
@@ -275,15 +284,25 @@ int main(int argc, char ** argv)
 {
   // Parse command line arguments
   if (argc < 3) {
-    std::cerr << "Usage: " << argv[0] << " <input_bag> <output_bag>\n"
+    std::cerr << "Usage: " << argv[0] << " <input_bag> <output_bag> [options]\n"
               << "\nThis tool automatically detects and converts all nebula packet topics.\n"
-              << "Topics containing '/nebula_packets' will be converted to '/nebula_points '.\n";
+              << "Topics containing '/nebula_packets' will be converted to '/nebula_points'.\n"
+              << "\nOptions:\n"
+              << "  --keep-original-topics    Keep original /nebula_packets topics in output bag\n";
     return 1;
   }
 
   SeyondNebulaBagDecoder::Config config;
   config.input_bag_path = argv[1];
   config.output_bag_path = argv[2];
+
+  // Parse optional arguments
+  for (int i = 3; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg == "--keep-original-topics") {
+      config.keep_original_topics = true;
+    }
+  }
 
   // Initialize ROS2 (required for serialization)
   rclcpp::init(argc, argv);
