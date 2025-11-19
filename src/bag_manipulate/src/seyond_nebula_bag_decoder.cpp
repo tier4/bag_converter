@@ -33,8 +33,6 @@ public:
   {
     std::string input_bag_path;
     std::string output_bag_path;
-    std::string nebula_packets_topic;  // Empty = auto-detect all nebula topics
-    std::string pointcloud_topic;      // Empty = auto-generate from input topic
 
     // Decoder configuration
     std::string sensor_model = "Falcon";
@@ -124,52 +122,14 @@ public:
     }
 
     if (nebula_topic_mapping.empty()) {
-      // Fall back to single topic mode if explicitly specified
-      if (!config_.nebula_packets_topic.empty()) {
-        bool topic_found = false;
-        for (const auto & topic : metadata.topics_with_message_count) {
-          if (topic.topic_metadata.name == config_.nebula_packets_topic) {
-            topic_found = true;
-            nebula_topic_mapping[config_.nebula_packets_topic] = config_.pointcloud_topic;
-
-            seyond_nebula_decoder::DecoderConfig decoder_config;
-            decoder_config.sensor_model = config_.sensor_model;
-            decoder_config.return_mode = config_.return_mode;
-            decoder_config.min_range = config_.min_range;
-            decoder_config.max_range = config_.max_range;
-            decoder_config.calibration_file = config_.calibration_file;
-            decoder_config.frame_id = config_.frame_id;
-            decoders[config_.nebula_packets_topic] =
-              std::make_unique<seyond_nebula_decoder::SeyondNebulaDecoder>(decoder_config);
-
-            std::cout << "Using specified topic: " << config_.nebula_packets_topic << " -> "
-                      << config_.pointcloud_topic << " (" << topic.message_count << " messages)"
-                      << std::endl;
-            break;
-          }
-        }
-
-        if (!topic_found) {
-          std::cerr << "Error: Topic " << config_.nebula_packets_topic << " not found in bag"
-                    << std::endl;
-          std::cout << "Available topics:" << std::endl;
-          for (const auto & topic : metadata.topics_with_message_count) {
-            std::cout << "  - " << topic.topic_metadata.name << " (" << topic.message_count
-                      << " messages)" << std::endl;
-          }
-          return false;
-        }
-      } else {
-        std::cout << "No Nebula packet topics found in the input bag!" << std::endl;
-        std::cout << "Looking for topics containing '/nebula_packets' with type "
-                     "'nebula_msgs/msg/NebulaPackets'"
-                  << std::endl;
-        return false;
-      }
-    } else {
-      std::cout << "\nFound " << nebula_topic_mapping.size() << " Nebula topic(s) to convert"
+      std::cout << "No Nebula packet topics found in the input bag!" << std::endl;
+      std::cout << "Looking for topics containing '/nebula_packets' with type "
+                   "'nebula_msgs/msg/NebulaPackets'"
                 << std::endl;
+      return false;
     }
+    std::cout << "\nFound " << nebula_topic_mapping.size() << " Nebula topic(s) to convert"
+              << std::endl;
 
     // Prepare output bag
     rosbag2_storage::StorageOptions storage_options_out;
@@ -320,21 +280,17 @@ int main(int argc, char ** argv)
 {
   // Parse command line arguments
   if (argc < 3) {
-    std::cerr
-      << "Usage: " << argv[0] << " <input_bag> <output_bag> [options]\n"
-      << "\nThis tool automatically detects and converts all Nebula packet topics.\n"
-      << "Topics containing '/nebula_packets' will be converted to '/pointcloud'.\n"
-      << "\nOptions:\n"
-      << "  --nebula-topic <topic>  : Specific nebula packets topic (auto-detects if not "
-         "specified)\n"
-      << "  --output-topic <topic>  : Output pointcloud topic (auto-generates if not specified)\n"
-      << "  --sensor-model <model>  : Sensor model (default: Falcon)\n"
-      << "  --return-mode <mode>    : Return mode (default: Dual)\n"
-      << "  --frame-id <id>         : Frame ID (default: lidar_top)\n"
-      << "  --min-range <meters>    : Minimum range (default: 0.3)\n"
-      << "  --max-range <meters>    : Maximum range (default: 200.0)\n"
-      << "  --coordinate-mode <int> : Coordinate mode 0-3 (default: 3)\n"
-      << "  --calibration-file <file>    : Calibration file path\n";
+    std::cerr << "Usage: " << argv[0] << " <input_bag> <output_bag> [options]\n"
+              << "\nThis tool automatically detects and converts all Nebula packet topics.\n"
+              << "Topics containing '/nebula_packets' will be converted to '/pointcloud'.\n"
+              << "\nOptions:\n"
+              << "  --sensor-model <model>  : Sensor model (default: Falcon)\n"
+              << "  --return-mode <mode>    : Return mode (default: Dual)\n"
+              << "  --frame-id <id>         : Frame ID (default: lidar_top)\n"
+              << "  --min-range <meters>    : Minimum range (default: 0.3)\n"
+              << "  --max-range <meters>    : Maximum range (default: 200.0)\n"
+              << "  --coordinate-mode <int> : Coordinate mode 0-3 (default: 3)\n"
+              << "  --calibration-file <file>    : Calibration file path\n";
     return 1;
   }
 
@@ -346,11 +302,7 @@ int main(int argc, char ** argv)
   for (int i = 3; i < argc; ++i) {
     std::string arg = argv[i];
 
-    if (arg == "--nebula-topic" && i + 1 < argc) {
-      config.nebula_packets_topic = argv[++i];
-    } else if (arg == "--output-topic" && i + 1 < argc) {
-      config.pointcloud_topic = argv[++i];
-    } else if (arg == "--sensor-model" && i + 1 < argc) {
+    if (arg == "--sensor-model" && i + 1 < argc) {
       config.sensor_model = argv[++i];
     } else if (arg == "--return-mode" && i + 1 < argc) {
       config.return_mode = argv[++i];
