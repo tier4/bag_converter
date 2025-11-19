@@ -16,8 +16,10 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/header.hpp>
 
+#include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -25,6 +27,19 @@
 #include <vector>
 
 namespace fs = std::filesystem;
+
+// Point type definition
+struct EIGEN_ALIGN16 PointXYZIT
+{
+  PCL_ADD_POINT4D;
+  float intensity;
+  uint32_t t_us;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(
+  PointXYZIT,
+  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us))
 
 class SeyondNebulaBagDecoder
 {
@@ -75,7 +90,7 @@ public:
     std::map<std::string, std::string> nebula_topic_mapping;  // input_topic -> output_topic
     std::map<std::string, std::unique_ptr<seyond_nebula_decoder::SeyondNebulaDecoder>> decoders;
 
-    std::cout << "Scanning for Nebula packet topics..." << std::endl;
+    std::cout << "Scanning for nebula packet topics..." << std::endl;
 
     for (const auto & topic_info : metadata.topics_with_message_count) {
       const auto & topic_metadata = topic_info.topic_metadata;
@@ -119,21 +134,20 @@ public:
         decoders[topic_metadata.name] =
           std::make_unique<seyond_nebula_decoder::SeyondNebulaDecoder>(decoder_config);
 
-        std::cout << "Found Nebula topic: " << topic_metadata.name << " -> " << converted_topic
-                  << " (frame_id: " << decoder_config.frame_id << ", " << topic_info.message_count
-                  << " messages)" << std::endl;
+        std::cout << "Found a decodable topic: " << topic_metadata.name
+                  << " (sensor_model: " << decoder_config.sensor_model
+                  << ", return_mode: " << decoder_config.return_mode
+                  << ", min_range=" << decoder_config.min_range
+                  << ", max_range=" << decoder_config.max_range
+                  << ", frame_id=" << decoder_config.frame_id << ")" << std::endl;
       }
     }
 
     if (nebula_topic_mapping.empty()) {
-      std::cout << "No Nebula packet topics found in the input bag!" << std::endl;
-      std::cout << "Looking for topics containing '/nebula_packets' with type "
-                   "'nebula_msgs/msg/NebulaPackets'"
+      std::cout << "No nebula packet topics found in the input bag: " << config_.input_bag_path
                 << std::endl;
       return false;
     }
-    std::cout << "\nFound " << nebula_topic_mapping.size() << " Nebula topic(s) to convert"
-              << std::endl;
 
     // Prepare output bag
     rosbag2_storage::StorageOptions storage_options_out;
@@ -178,97 +192,79 @@ public:
     rclcpp::Serialization<nebula_msgs::msg::NebulaPackets> nebula_serializer;
     rclcpp::Serialization<sensor_msgs::msg::PointCloud2> pc2_serializer;
 
-    size_t message_count = 0;
-    size_t packets_processed = 0;
-    size_t clouds_generated = 0;
-    std::map<std::string, size_t> topic_conversion_counts;
+    std::map<std::string, size_t> topic_conversion_success_counts;
+    std::map<std::string, size_t> topic_conversion_failure_counts;
 
     while (reader.has_next()) {
       auto bag_message = reader.read_next();
-      message_count++;
 
       // Check if this is a nebula topic to convert
       auto it = nebula_topic_mapping.find(bag_message->topic_name);
-      if (it != nebula_topic_mapping.end()) {
-        // Process nebula packets
-        // Deserialize nebula_msgs
-        rclcpp::SerializedMessage serialized_msg(*bag_message->serialized_data);
-        nebula_msgs::msg::NebulaPackets nebula_msgs;
-        nebula_serializer.deserialize_message(&serialized_msg, &nebula_msgs);
-
-        packets_processed++;
-        topic_conversion_counts[bag_message->topic_name]++;
-
-        // Get decoder for this topic
-        auto & decoder = decoders[bag_message->topic_name];
-
-        // Decode packets to point cloud directly using nebula_msgs
-        auto nebula_cloud = decoder->ConvertNebulaPackets(nebula_msgs);
-
-        if (nebula_cloud && !nebula_cloud->empty()) {
-          // Convert to PointCloud2 message
-          sensor_msgs::msg::PointCloud2 pc2_msg;
-
-          // Nebula uses PointXYZIRCAEDT, need to convert
-          pcl::PointCloud<pcl::PointXYZI> simple_cloud;
-          simple_cloud.header = nebula_cloud->header;
-          simple_cloud.width = nebula_cloud->width;
-          simple_cloud.height = nebula_cloud->height;
-          simple_cloud.is_dense = nebula_cloud->is_dense;
-
-          for (const auto & pt : nebula_cloud->points) {
-            pcl::PointXYZI simple_pt;
-            simple_pt.x = pt.x;
-            simple_pt.y = pt.y;
-            simple_pt.z = pt.z;
-            simple_pt.intensity = pt.intensity;
-            simple_cloud.push_back(simple_pt);
-          }
-
-          pcl::toROSMsg(simple_cloud, pc2_msg);
-
-          // Set header
-          uint64_t timestamp_us = nebula_cloud->header.stamp;
-          pc2_msg.header.stamp.sec = timestamp_us / 1000000;
-          pc2_msg.header.stamp.nanosec = (timestamp_us % 1000000) * 1000;
-          pc2_msg.header.frame_id = nebula_msgs.header.frame_id.empty()
-                                      ? decoder->GetConfig().frame_id
-                                      : nebula_msgs.header.frame_id;
-
-          // Serialize and write to bag
-          auto serialized_pc2 = std::make_shared<rclcpp::SerializedMessage>();
-          pc2_serializer.serialize_message(&pc2_msg, serialized_pc2.get());
-
-          // Write to bag file using the same pattern as seyond_bag_decoder.cpp
-          writer.write(
-            serialized_pc2,
-            it->second,  // Use mapped output topic name
-            "sensor_msgs/msg/PointCloud2", rclcpp::Time(bag_message->time_stamp));
-
-          clouds_generated++;
-        }
-      } else {
-        // Write other messages as-is
+      if (it == nebula_topic_mapping.end()) {
+        // Write other messages as-is and continue
         writer.write(bag_message);
+        continue;
       }
 
-      if (message_count % 1000 == 0) {
-        std::cout << "Processed " << message_count << " messages, converted " << packets_processed
-                  << " nebula packets" << std::endl;
+      // Deserialize message
+      rclcpp::SerializedMessage serialized_msg(*bag_message->serialized_data);
+      nebula_msgs::msg::NebulaPackets nebula_packets;
+      nebula_serializer.deserialize_message(&serialized_msg, &nebula_packets);
+
+      // Get decoder for this topic
+      auto & decoder = decoders[bag_message->topic_name];
+
+      // Decode packets to point cloud directly using nebula_msgs
+      auto nebula_cloud = decoder->ConvertNebulaPackets(nebula_packets);
+
+      if (nebula_cloud && !nebula_cloud->empty()) {
+        topic_conversion_success_counts[bag_message->topic_name]++;
+        // Convet to PointCloud2 message
+        sensor_msgs::msg::PointCloud2 pc2_msg;
+        pcl::PointCloud<PointXYZIT> pc2_cloud;
+        pc2_cloud.header = nebula_cloud->header;
+        pc2_cloud.width = nebula_cloud->width;
+        pc2_cloud.height = nebula_cloud->height;
+        pc2_cloud.is_dense = nebula_cloud->is_dense;
+
+        for (const auto & pt : nebula_cloud->points) {
+          PointXYZIT pc2_pt;
+          pc2_pt.x = pt.x;
+          pc2_pt.y = pt.y;
+          pc2_pt.z = pt.z;
+          pc2_pt.intensity = pt.intensity;
+          pc2_pt.t_us = pt.time_stamp;
+          pc2_cloud.push_back(pc2_pt);
+        }
+
+        pcl::toROSMsg(pc2_cloud, pc2_msg);
+
+        // Set header
+        pc2_msg.header.stamp.sec = pc2_cloud.header.stamp / 1000'000;
+        pc2_msg.header.stamp.nanosec = (pc2_cloud.header.stamp % 1000'000) * 1000;
+        pc2_msg.header.frame_id = decoder->GetConfig().frame_id;
+
+        // Serialize and write to bag
+        auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
+        pc2_serializer.serialize_message(&pc2_msg, pc2_msg_serialized.get());
+
+        // Write to bag file using the same pattern as seyond_bag_decoder.cpp
+        writer.write(
+          pc2_msg_serialized,
+          it->second,  // Use mapped output topic name
+          "sensor_msgs/msg/PointCloud2", rclcpp::Time(bag_message->time_stamp));
+      } else {
+        topic_conversion_failure_counts[bag_message->topic_name]++;
       }
     }
 
     std::cout << "\n========== Conversion Summary ==========" << std::endl;
-    std::cout << "Total messages processed: " << message_count << std::endl;
-    std::cout << "Total Nebula packets processed: " << packets_processed << std::endl;
-    std::cout << "Total point clouds generated: " << clouds_generated << std::endl;
-
-    if (!topic_conversion_counts.empty()) {
-      std::cout << "\nConversion details by topic:" << std::endl;
-      for (const auto & [topic, count] : topic_conversion_counts) {
-        std::cout << "  " << topic << ": " << count << " messages" << std::endl;
-        std::cout << "    -> " << nebula_topic_mapping[topic] << std::endl;
-      }
+    for (const auto & [topic, count] : topic_conversion_success_counts) {
+      std::cout << "[" << topic << "]" << std::endl;
+      std::cout << "    Destination topic: " << nebula_topic_mapping[topic] << std::endl;
+      std::cout << "    Decoded successfully: " << count << " messages" << std::endl;
+      std::cout << "    Decoded failed: " << topic_conversion_failure_counts[topic] << " messages"
+                << std::endl;
     }
     std::cout << "Output written to: " << config_.output_bag_path << std::endl;
     std::cout << "========================================" << std::endl;
@@ -284,41 +280,15 @@ int main(int argc, char ** argv)
 {
   // Parse command line arguments
   if (argc < 3) {
-    std::cerr << "Usage: " << argv[0] << " <input_bag> <output_bag> [options]\n"
-              << "\nThis tool automatically detects and converts all Nebula packet topics.\n"
-              << "Topics containing '/nebula_packets' will be converted to '/pointcloud'.\n"
-              << "\nOptions:\n"
-              << "  --return-mode <mode>    : Return mode (default: Dual)\n"
-              << "  --frame-id <id>         : Frame ID (default: lidar_top)\n"
-              << "  --min-range <meters>    : Minimum range (default: 0.3)\n"
-              << "  --max-range <meters>    : Maximum range (default: 200.0)\n"
-              << "  --coordinate-mode <int> : Coordinate mode 0-3 (default: 3)\n"
-              << "  --calibration-file <file>    : Calibration file path\n";
+    std::cerr << "Usage: " << argv[0] << " <input_bag> <output_bag>\n"
+              << "\nThis tool automatically detects and converts all nebula packet topics.\n"
+              << "Topics containing '/nebula_packets' will be converted to '/nebula_points '.\n";
     return 1;
   }
 
   SeyondNebulaBagDecoder::Config config;
   config.input_bag_path = argv[1];
   config.output_bag_path = argv[2];
-
-  // Parse optional arguments
-  for (int i = 3; i < argc; ++i) {
-    std::string arg = argv[i];
-
-    if (arg == "--return-mode" && i + 1 < argc) {
-      config.return_mode = argv[++i];
-    } else if (arg == "--frame-id" && i + 1 < argc) {
-      config.frame_id = argv[++i];
-    } else if (arg == "--min-range" && i + 1 < argc) {
-      config.min_range = std::stod(argv[++i]);
-    } else if (arg == "--max-range" && i + 1 < argc) {
-      config.max_range = std::stod(argv[++i]);
-    } else if (arg == "--coordinate-mode" && i + 1 < argc) {
-      config.coordinate_mode = std::stoi(argv[++i]);
-    } else if (arg == "--calibration-file" && i + 1 < argc) {
-      config.calibration_file = argv[++i];
-    }
-  }
 
   // Initialize ROS2 (required for serialization)
   rclcpp::init(argc, argv);
