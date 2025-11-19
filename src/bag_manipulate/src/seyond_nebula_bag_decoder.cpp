@@ -33,8 +33,8 @@ public:
   {
     std::string input_bag_path;
     std::string output_bag_path;
-    std::string nebula_packets_topic = "";  // Empty = auto-detect all nebula topics
-    std::string pointcloud_topic = "";      // Empty = auto-generate from input topic
+    std::string nebula_packets_topic;  // Empty = auto-detect all nebula topics
+    std::string pointcloud_topic;      // Empty = auto-generate from input topic
 
     // Decoder configuration
     std::string sensor_model = "Falcon";
@@ -44,28 +44,10 @@ public:
     double max_range = 200.0;
     int coordinate_mode = 3;
     bool use_reflectance = true;
-    std::string calibration_file = "";
-
-    bool verbose = false;
+    std::string calibration_file;
   };
 
-  explicit SeyondNebulaBagDecoder(const Config & config) : config_(config)
-  {
-    if (config_.verbose) {
-      std::cout << "Initialized Seyond Nebula Bag Decoder:\n"
-                << "  Input: " << config_.input_bag_path << "\n"
-                << "  Output: " << config_.output_bag_path << "\n";
-      if (!config_.nebula_packets_topic.empty()) {
-        std::cout << "  Nebula packets topic: " << config_.nebula_packets_topic << "\n"
-                  << "  Output pointcloud topic: " << config_.pointcloud_topic << "\n";
-      } else {
-        std::cout << "  Auto-detecting Nebula topics...\n";
-      }
-      std::cout << "  Sensor model: " << config_.sensor_model << "\n"
-                << "  Min range: " << config_.min_range << " m\n"
-                << "  Max range: " << config_.max_range << " m\n";
-    }
-  }
+  explicit SeyondNebulaBagDecoder(Config config) : config_(std::move(config)) {}
 
   bool process()
   {
@@ -300,11 +282,6 @@ public:
             "sensor_msgs/msg/PointCloud2", rclcpp::Time(bag_message->time_stamp));
 
           clouds_generated++;
-
-          if (config_.verbose && clouds_generated % 10 == 0) {
-            std::cout << "Generated " << clouds_generated << " point clouds from "
-                      << packets_processed << " packet messages" << std::endl;
-          }
         }
       } else {
         // Write other messages as-is
@@ -357,8 +334,7 @@ int main(int argc, char ** argv)
       << "  --min-range <meters>    : Minimum range (default: 0.3)\n"
       << "  --max-range <meters>    : Maximum range (default: 200.0)\n"
       << "  --coordinate-mode <int> : Coordinate mode 0-3 (default: 3)\n"
-      << "  --calibration <file>    : Calibration file path\n"
-      << "  --verbose               : Verbose output\n";
+      << "  --calibration-file <file>    : Calibration file path\n";
     return 1;
   }
 
@@ -386,10 +362,8 @@ int main(int argc, char ** argv)
       config.max_range = std::stod(argv[++i]);
     } else if (arg == "--coordinate-mode" && i + 1 < argc) {
       config.coordinate_mode = std::stoi(argv[++i]);
-    } else if (arg == "--calibration" && i + 1 < argc) {
+    } else if (arg == "--calibration-file" && i + 1 < argc) {
       config.calibration_file = argv[++i];
-    } else if (arg == "--verbose") {
-      config.verbose = true;
     }
   }
 
