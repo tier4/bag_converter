@@ -195,34 +195,34 @@ public:
     std::map<std::string, size_t> topic_conversion_failure_counts;
 
     while (reader.has_next()) {
-      auto bag_message = reader.read_next();
+      auto bag_msg = reader.read_next();
 
       // Check if this is a nebula topic to convert
-      auto it = nebula_topic_mapping.find(bag_message->topic_name);
+      auto it = nebula_topic_mapping.find(bag_msg->topic_name);
       if (it == nebula_topic_mapping.end()) {
         // Write other messages as-is and continue
-        writer.write(bag_message);
+        writer.write(bag_msg);
         continue;
       }
 
       // Write original nebula packets message if requested
       if (config_.keep_original_topics) {
-        writer.write(bag_message);
+        writer.write(bag_msg);
       }
 
       // Deserialize message
-      rclcpp::SerializedMessage serialized_msg(*bag_message->serialized_data);
-      nebula_msgs::msg::NebulaPackets nebula_packets;
-      nebula_serializer.deserialize_message(&serialized_msg, &nebula_packets);
+      rclcpp::SerializedMessage serialized_msg(*bag_msg->serialized_data);
+      nebula_msgs::msg::NebulaPackets nebula_msg;
+      nebula_serializer.deserialize_message(&serialized_msg, &nebula_msg);
 
       // Get decoder for this topic
-      auto & decoder = decoders[bag_message->topic_name];
+      auto & decoder = decoders[bag_msg->topic_name];
 
       // Decode packets to point cloud directly using nebula_msgs
-      auto nebula_cloud = decoder->ConvertNebulaPackets(nebula_packets);
+      auto nebula_cloud = decoder->ConvertNebulaPackets(nebula_msg);
 
       if (nebula_cloud && !nebula_cloud->empty()) {
-        topic_conversion_success_counts[bag_message->topic_name]++;
+        topic_conversion_success_counts[bag_msg->topic_name]++;
         // Convet to PointCloud2 message
         sensor_msgs::msg::PointCloud2 pc2_msg;
         pcl::PointCloud<PointXYZIT> pc2_cloud;
@@ -256,9 +256,9 @@ public:
         writer.write(
           pc2_msg_serialized,
           it->second,  // Use mapped output topic name
-          "sensor_msgs/msg/PointCloud2", rclcpp::Time(bag_message->time_stamp));
+          "sensor_msgs/msg/PointCloud2", rclcpp::Time(bag_msg->time_stamp));
       } else {
-        topic_conversion_failure_counts[bag_message->topic_name]++;
+        topic_conversion_failure_counts[bag_msg->topic_name]++;
       }
     }
 
