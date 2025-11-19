@@ -85,12 +85,11 @@ public:
         topic_metadata.type == "nebula_msgs/msg/NebulaPackets" &&
         topic_metadata.name.find("/nebula_packets") != std::string::npos) {
         // Generate converted topic name (replace nebula_packets with pointcloud)
-        std::string converted_topic = topic_metadata.name;
-        size_t pos = converted_topic.find("/nebula_packets");
-        if (pos != std::string::npos) {
-          converted_topic.replace(pos, 15, "/nebula_points");  // 15 is length of "/nebula_packets"
+        size_t pos = topic_metadata.name.find("/nebula_packets");
+        if (pos == std::string::npos) {
+          continue;
         }
-
+        std::string converted_topic = topic_metadata.name.substr(0, pos) + "/nebula_points";
         nebula_topic_mapping[topic_metadata.name] = converted_topic;
 
         // Create decoder for this topic with appropriate frame_id
@@ -101,14 +100,19 @@ public:
         decoder_config.max_range = config_.max_range;
         decoder_config.calibration_file = config_.calibration_file;
 
-        // Extract sensor name from topic (e.g., /sensing/lidar/top/nebula_packets -> lidar_top)
+        // Extract sensor name from topic (e.g., /sensing/lidar/front/nebula_packets -> lidar_front)
         size_t last_slash = topic_metadata.name.rfind("/nebula_packets");
         if (last_slash != std::string::npos && last_slash > 0) {
           size_t second_last_slash = topic_metadata.name.rfind('/', last_slash - 1);
           if (second_last_slash != std::string::npos) {
-            std::string sensor_name =
+            std::string sensor_pos =
               topic_metadata.name.substr(second_last_slash + 1, last_slash - second_last_slash - 1);
-            decoder_config.frame_id = "lidar_" + sensor_name;
+            decoder_config.frame_id = "lidar_" + sensor_pos;
+            if (sensor_pos == "front" || sensor_pos == "rear") {
+              decoder_config.sensor_model = "Falcon";
+            } else if (sensor_pos == "left" || sensor_pos == "right") {
+              decoder_config.sensor_model = "Robin_W";
+            }
           }
         }
 
@@ -284,7 +288,6 @@ int main(int argc, char ** argv)
               << "\nThis tool automatically detects and converts all Nebula packet topics.\n"
               << "Topics containing '/nebula_packets' will be converted to '/pointcloud'.\n"
               << "\nOptions:\n"
-              << "  --sensor-model <model>  : Sensor model (default: Falcon)\n"
               << "  --return-mode <mode>    : Return mode (default: Dual)\n"
               << "  --frame-id <id>         : Frame ID (default: lidar_top)\n"
               << "  --min-range <meters>    : Minimum range (default: 0.3)\n"
@@ -302,9 +305,7 @@ int main(int argc, char ** argv)
   for (int i = 3; i < argc; ++i) {
     std::string arg = argv[i];
 
-    if (arg == "--sensor-model" && i + 1 < argc) {
-      config.sensor_model = argv[++i];
-    } else if (arg == "--return-mode" && i + 1 < argc) {
+    if (arg == "--return-mode" && i + 1 < argc) {
       config.return_mode = argv[++i];
     } else if (arg == "--frame-id" && i + 1 < argc) {
       config.frame_id = argv[++i];
