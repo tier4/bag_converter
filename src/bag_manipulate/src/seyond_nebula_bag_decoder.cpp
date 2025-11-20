@@ -296,6 +296,7 @@ public:
         // Convert to PointXYZIT for PCL conversion
         pcl::PointCloud<PointXYZIT> pc2_cloud;
         pc2_cloud.header = nebula_cloud->header;
+        pc2_cloud.header.frame_id = decoder->GetConfig().frame_id;
         pc2_cloud.width = nebula_cloud->width;
         pc2_cloud.height = nebula_cloud->height;
         pc2_cloud.is_dense = nebula_cloud->is_dense;
@@ -308,6 +309,8 @@ public:
           pc2_pt.t_us = pt.time_stamp;
           pc2_cloud.push_back(pc2_pt);
         }
+
+        // Create PointCloud2 message
         sensor_msgs::msg::PointCloud2 pc2_msg;
         pcl::toROSMsg(pc2_cloud, pc2_msg);
 
