@@ -204,7 +204,7 @@ public:
     if (nebula_topic_mapping.empty()) {
       std::cout << "No nebula packet topics found in the input bag: " << config_.input_bag_path
                 << std::endl;
-      return false;
+      return true;
     }
 
     // Prepare output bag
