@@ -86,7 +86,7 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
   const std::vector<std::vector<uint8_t>> & packets)
 {
   nebula::drivers::NebulaPointCloudPtr complete_cloud;
-  double scan_timestamp_s = 0.0;
+  double scan_timestamp_s = 0;
 
   for (const auto & packet : packets) {
     auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet);
@@ -94,14 +94,16 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
     if (cloud && !cloud->empty()) {
       // A complete scan was returned
       complete_cloud = cloud;
-      scan_timestamp_s = cloud_timestamp;  // Capture timestamp parsed from packet data
+      scan_timestamp_s = cloud_timestamp;
     }
   }
 
   // Set the timestamp in the point cloud header
-  if (complete_cloud && scan_timestamp_s > 0.0) {
+  if (complete_cloud && scan_timestamp_s > 0) {
     // Convert seconds to microseconds (PCL header.stamp is in microseconds)
     complete_cloud->header.stamp = static_cast<uint64_t>(scan_timestamp_s * 1e6);
+  } else {
+    std::cerr << "An incomplete scan was detected (skipped)" << std::endl;
   }
 
   // Return the last complete cloud if available
@@ -122,41 +124,6 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ConvertNebulaPackets(
   return ProcessPackets(packet_data_vec);
 }
 
-void SeyondNebulaDecoder::ReinitializeDriver()
-{
-  // Reinitialize the driver with the same configuration
-  try {
-    driver_ = std::make_shared<nebula::drivers::SeyondDriver>(sensor_config_, calibration_config_);
-    status_ = driver_->GetStatus();
-  } catch (const std::exception & e) {
-    std::cerr << "Failed to reinitialize driver: " << e.what() << "\n";
-    status_ = nebula::Status::SENSOR_CONFIG_ERROR;
-  }
-}
-
-void SeyondNebulaDecoder::SetCalibrationData(const std::vector<uint8_t> & calibration_data)
-{
-  // For RobinW, the calibration packet contains the full AngleHV table
-  // We need to pass this to the driver in the format it expects
-
-  // Convert vector to string (the driver expects this format)
-  std::string calib_string(calibration_data.begin(), calibration_data.end());
-
-  // Create new calibration configuration
-  auto new_calibration_config = std::make_shared<nebula::drivers::SeyondCalibrationConfiguration>();
-
-  // Load the calibration string directly - the driver will parse it
-  new_calibration_config->LoadFromString(calib_string);
-
-  // Store the calibration configuration
-  calibration_config_ = new_calibration_config;
-
-  // Reinitialize driver with new calibration
-  ReinitializeDriver();
-
-  std::cout << "Calibration data set (" << calibration_data.size() << " bytes)\n";
-}
-
 void SeyondNebulaDecoder::SetConfig(const DecoderConfig & config)
 {
   config_ = config;
@@ -170,9 +137,6 @@ void SeyondNebulaDecoder::SetConfig(const DecoderConfig & config)
   sensor_config_->use_sensor_time = config.use_sensor_time;
   sensor_config_->min_range = config.min_range;
   sensor_config_->max_range = config.max_range;
-
-  // Reinitialize driver with new configuration
-  ReinitializeDriver();
 }
 
 }  // namespace seyond_nebula_decoder

@@ -8,7 +8,12 @@ endif()
 find_package(ament_cmake REQUIRED)
 
 # Set C++ standard (must be after ament_cmake)
-set(CMAKE_CXX_STANDARD 17)
+# Ensure C++17 or higher (default to 17 if not set)
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+elseif(CMAKE_CXX_STANDARD LESS 17)
+  message(FATAL_ERROR "CMAKE_CXX_STANDARD must be 17 or higher (got ${CMAKE_CXX_STANDARD})")
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(rclcpp REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
@@ -24,28 +29,6 @@ find_package(seyond_nebula_decoder REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 
-add_executable(bag_manipulate
-  src/bag_manipulate.cpp
-)
-
-ament_target_dependencies(bag_manipulate
-  rclcpp
-  rosbag2_cpp
-  rosbag2_storage
-  rcpputils
-  rcutils
-  sensor_msgs
-  std_msgs
-)
-
-target_include_directories(bag_manipulate PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
-
-install(TARGETS bag_manipulate
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 # Build seyond_bag_decoder executable
 add_executable(seyond_bag_decoder

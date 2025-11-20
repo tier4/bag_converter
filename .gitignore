@@ -17,3 +17,10 @@ log/
 /src/nebula_drs/
 /src/seyond_decoder/src/seyond_sdk/
 /src/oxts_ros2_driver/
+
+# rosbags
+*.mcap
+*.db
+*.db3
+*.sqlite3
+metadata.yaml

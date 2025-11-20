@@ -34,7 +34,7 @@ namespace seyond_nebula_decoder
 // Default configuration constants
 namespace defaults
 {
-inline constexpr const char * sensor_model = "Falcon_Kinetic";
+inline constexpr const char * sensor_model = "Falcon";
 inline constexpr const char * return_mode = "Dual";
 inline constexpr const char * frame_id = "seyond";
 inline constexpr double min_range = 0.3;
@@ -91,12 +91,6 @@ public:
   /// @return Nebula format point cloud
   nebula::drivers::NebulaPointCloudPtr ConvertNebulaPackets(
     const nebula_msgs::msg::NebulaPackets & packets);
-
-  /// @brief Reinitialize driver (useful for error recovery)
-  void ReinitializeDriver();
-
-  /// @brief Set calibration data
-  void SetCalibrationData(const std::vector<uint8_t> & calibration_data);
 
   /// @brief Get current status
   nebula::Status GetStatus() const { return status_; }
