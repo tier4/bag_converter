@@ -11,6 +11,7 @@ and reading all available fields. It supports:
 """
 
 import argparse
+import time
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +23,7 @@ from sensor_msgs_py import point_cloud2 as pc2
 import rosbag2_py
 
 
-def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show: int = 100):
+def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show: int = 100, delay: float | None = None):
     """
     Decode PointCloud2 messages from a rosbag2 file.
 
@@ -30,6 +31,7 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
         bag_path: Path to the rosbag2 directory or file
         topic_name: Optional topic name to filter. If None, reads all PointCloud2 topics.
         max_points_to_show: Maximum number of points to display per message (default: 100)
+        delay: Delay between messages in seconds (default: None, no delay)
     """
     # Initialize ROS 2 (required for message deserialization)
     rclpy.init()
@@ -84,79 +86,102 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
         
         message_count = 0
         
-        # Read messages
-        while reader.has_next():
-            (topic, data, timestamp) = reader.read_next()
-            
-            # Filter by topic if needed
-            if topic not in selected_topics:
-                continue
-            
-            # Deserialize message
-            msg = deserialize_message(data, msg_type)
-            
-            if not isinstance(msg, PointCloud2):
-                continue
-            
-            message_count += 1
-            
-            # Decode point cloud
-            points = decode_point(msg)
-            
-            if points is not None:
-                # Get actual number of points from first available field
-                field_names = list(points.keys())
-                if not field_names:
+        try:
+            # Read messages
+            while reader.has_next():
+                (topic, data, timestamp) = reader.read_next()
+                
+                # Filter by topic if needed
+                if topic not in selected_topics:
                     continue
                 
-                num_points = len(points[field_names[0]]) if len(points[field_names[0]]) > 0 else 0
+                # Deserialize message
+                msg = deserialize_message(data, msg_type)
                 
-                if num_points == 0:
+                if not isinstance(msg, PointCloud2):
                     continue
                 
-                # Calculate base timestamp in microseconds (if t_us field exists)
-                base_time_us = None
-                if 't_us' in points and len(points['t_us']) > 0:
-                    base_time_us = msg.header.stamp.sec * 1_000_000 + msg.header.stamp.nanosec // 1_000
+                message_count += 1
                 
-                # Convert timestamp from nanoseconds to seconds and nanoseconds
-                received_sec = timestamp // 1_000_000_000
-                received_nanosec = timestamp % 1_000_000_000
+                # Decode point cloud
+                points = decode_point(msg)
                 
-                print(f"\n[{topic}] Message #{message_count}")
-                print(f"  Scan started at: {msg.header.stamp.sec}.{msg.header.stamp.nanosec:09d}")
-                print(f"  Message received at: {received_sec}.{received_nanosec:09d}")
-                print(f"  Frame ID: {msg.header.frame_id}")
-                print(f"  Number of points decoded: {num_points}")
-                print(f"  Available fields: {', '.join(field_names)}")
-                
-                # Show summary of first N points
-                num_points_to_show = min(max_points_to_show, num_points)
-                print(f"  First {num_points_to_show} points:")
-                
-                for i in range(num_points_to_show):
-                    # Build point info string dynamically
-                    point_info_parts = []
-                    for field_name in field_names:
-                        field_data = points[field_name]
-                        if len(field_data) > i:
-                            if field_name == 't_us' and base_time_us is not None:
-                                # Calculate absolute timestamp for t_us
-                                abs_time_us = base_time_us + field_data[i]
-                                abs_time_sec = abs_time_us / 1_000_000.0
-                                point_info_parts.append(f"{field_name}={field_data[i]}, abs_time={abs_time_sec:.6f}")
-                            elif isinstance(field_data[i], (float, np.floating)):
-                                point_info_parts.append(f"{field_name}={field_data[i]:.3f}")
-                            else:
-                                point_info_parts.append(f"{field_name}={field_data[i]}")
+                if points is not None:
+                    # Get actual number of points from first available field
+                    field_names = list(points.keys())
+                    if not field_names:
+                        continue
                     
-                    print(f"    Point {i}: {', '.join(point_info_parts)}")
-        
-        print(f"\nTotal messages processed: {message_count}")
+                    num_points = len(points[field_names[0]]) if len(points[field_names[0]]) > 0 else 0
+                    
+                    if num_points == 0:
+                        continue
+                    
+                    # Calculate base timestamp in microseconds (if t_us field exists)
+                    base_time_us = None
+                    if 't_us' in points and len(points['t_us']) > 0:
+                        base_time_us = msg.header.stamp.sec * 1_000_000 + msg.header.stamp.nanosec // 1_000
+                    
+                    # Convert timestamp from nanoseconds to seconds and nanoseconds
+                    received_sec = timestamp // 1_000_000_000
+                    received_nanosec = timestamp % 1_000_000_000
+                    
+                    print(f"\n[{topic}] Message #{message_count}")
+                    print(f"  Scan started at: {msg.header.stamp.sec}.{msg.header.stamp.nanosec:09d}")
+                    print(f"  Message received at: {received_sec}.{received_nanosec:09d}")
+                    print(f"  Frame ID: {msg.header.frame_id}")
+                    print(f"  Number of points decoded: {num_points}")
+                    print(f"  Available fields: {', '.join(field_names)}")
+                    
+                    # Show summary of first N points
+                    num_points_to_show = min(max_points_to_show, num_points)
+                    print(f"  First {num_points_to_show} points:")
+                    
+                    for i in range(num_points_to_show):
+                        # Build point info string dynamically
+                        point_info_parts = []
+                        stamp_str = None
+                        
+                        for field_name in field_names:
+                            field_data = points[field_name]
+                            if len(field_data) > i:
+                                if field_name == 't_us' and base_time_us is not None:
+                                    # Calculate absolute timestamp for t_us
+                                    abs_time_us = base_time_us + field_data[i]
+                                    abs_time_sec = abs_time_us / 1_000_000.0
+                                    stamp_str = f"stamp={abs_time_sec:.6f}"
+                                    # Add t_us as a regular field
+                                    point_info_parts.append(f"{field_name}={field_data[i]}")
+                                elif field_name == 'intensity' and isinstance(field_data[i], (float, np.floating)):
+                                    point_info_parts.append(f"{field_name}={field_data[i]:.1f}")
+                                elif isinstance(field_data[i], (float, np.floating)):
+                                    point_info_parts.append(f"{field_name}={field_data[i]:.3f}")
+                                else:
+                                    point_info_parts.append(f"{field_name}={field_data[i]}")
+                        
+                        # Build final output string: Point N: fields | stamp
+                        if stamp_str:
+                            output = f"    Point {i}: {', '.join(point_info_parts)} | {stamp_str}"
+                        else:
+                            output = f"    Point {i}: {', '.join(point_info_parts)}"
+                        print(output)
+                
+                # Add delay between messages if specified
+                if delay is not None and reader.has_next():
+                    time.sleep(delay)
+            
+            print(f"\nTotal messages processed: {message_count}")
+        except KeyboardInterrupt:
+            print("\n\nTerminating safely....")
+            print(f"Total messages processed: {message_count}")
         
     finally:
         # Reader is automatically closed when it goes out of scope
-        rclpy.shutdown()
+        try:
+            rclpy.shutdown()
+        except Exception:
+            # Ignore errors if shutdown was already called
+            pass
 
 
 def decode_point(msg: PointCloud2) -> dict:
@@ -256,7 +281,7 @@ def decode_point(msg: PointCloud2) -> dict:
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(
-        description='Decode PointCloud2 messages with PointXYZIT from rosbag2',
+        description='Decode PointCloud2 messages from rosbag2',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -281,9 +306,17 @@ Examples:
     parser.add_argument(
         '--max-points-to-show',
         type=int,
-        default=100,
+        default=25,
         metavar='N',
-        help='Maximum number of points to display per message (default: 10)'
+        help='Maximum number of points to display per message (default: 25)'
+    )
+    
+    parser.add_argument(
+        '--delay',
+        type=float,
+        default=None,
+        metavar='SECONDS',
+        help='Delay between messages in seconds (default: None, no delay)'
     )
     
     args = parser.parse_args()
@@ -291,6 +324,7 @@ Examples:
     bag_path = args.bag_path
     topic_name = args.topic
     max_points_to_show = args.max_points_to_show
+    delay = args.delay
     
     if not Path(bag_path).exists():
         parser.error(f"Bag path does not exist: {bag_path}")
@@ -298,7 +332,10 @@ Examples:
     if max_points_to_show < 0:
         parser.error("--max-points-to-show must be non-negative")
     
-    decode_pointcloud2(bag_path, topic_name, max_points_to_show)
+    if delay is not None and delay < 0:
+        parser.error("--delay must be non-negative")
+    
+    decode_pointcloud2(bag_path, topic_name, max_points_to_show, delay)
 
 
 if __name__ == '__main__':
