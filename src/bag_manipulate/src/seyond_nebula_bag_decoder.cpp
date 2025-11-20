@@ -35,47 +35,47 @@ std::uint64_t correct_timescale(
   std::uint64_t ref_time_ns, std::uint64_t time_ns_to_correct,
   const std::string & ref_timescale = "utc")
 {
-  const double ref_time_sec = static_cast<double>(ref_time_ns) / 10e9;
-  const double time_sec_to_correct = static_cast<double>(time_ns_to_correct) / 10e9;
+  const double ref_time_sec = static_cast<double>(ref_time_ns) / 1e9;
+  const double time_sec_to_correct = static_cast<double>(time_ns_to_correct) / 1e9;
   const auto diff = ref_time_sec - time_sec_to_correct;
   if (ref_timescale == "utc") {
     // ref: UTC, to-correct: TAI
     if (
       diff > (-k_utc_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
       diff < (-k_utc_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct - static_cast<std::uint64_t>(k_utc_offset_to_tai_sec * 10e9);
+      return time_ns_to_correct - static_cast<std::uint64_t>(k_utc_offset_to_tai_sec * 1e9);
     }
     // ref: UTC, to-correct: GPS
     if (
       diff > (-k_utc_offset_to_gps_sec - k_timescale_correction_tolerance_sec) &&
       diff < (-k_utc_offset_to_gps_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct - static_cast<std::uint64_t>(k_utc_offset_to_gps_sec * 10e9);
+      return time_ns_to_correct - static_cast<std::uint64_t>(k_utc_offset_to_gps_sec * 1e9);
     }
   } else if (ref_timescale == "tai") {
     // ref: TAI, to-correct: UTC
     if (
       diff > (k_utc_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
       diff < (k_utc_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct + static_cast<std::uint64_t>(k_utc_offset_to_tai_sec * 10e9);
+      return time_ns_to_correct + static_cast<std::uint64_t>(k_utc_offset_to_tai_sec * 1e9);
     }
     // ref: TAI, to-correct: GPS
     if (
       diff > (k_gps_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
       diff < (k_gps_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct + static_cast<std::uint64_t>(k_gps_offset_to_tai_sec * 10e9);
+      return time_ns_to_correct + static_cast<std::uint64_t>(k_gps_offset_to_tai_sec * 1e9);
     }
   } else if (ref_timescale == "gps") {
     // ref: GPS, to-correct: UTC
     if (
       diff > (k_utc_offset_to_gps_sec - k_timescale_correction_tolerance_sec) &&
       diff < (k_utc_offset_to_gps_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct + static_cast<std::uint64_t>(k_utc_offset_to_gps_sec * 10e9);
+      return time_ns_to_correct + static_cast<std::uint64_t>(k_utc_offset_to_gps_sec * 1e9);
     }
     // ref: GPS, to-correct: TAI
     if (
       diff > (-k_gps_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
       diff < (-k_gps_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct - static_cast<std::uint64_t>(k_gps_offset_to_tai_sec * 10e9);
+      return time_ns_to_correct - static_cast<std::uint64_t>(k_gps_offset_to_tai_sec * 1e9);
     }
   }
   return time_ns_to_correct;
