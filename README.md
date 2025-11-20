@@ -83,3 +83,11 @@ python scripts/decode_pointcloud2.py <path-to-bag> --max-points-to-show 10
 # Add delay between messages (in seconds)
 python scripts/decode_pointcloud2.py <path-to-bag> --delay 0.1
 ```
+
+### Example Output
+
+The following image shows example output from `decode_pointcloud2.py`:
+
+<img src="media/decode_pointcloud2_output.png" alt="decode_pointcloud2.py output" width="800">
+
+**Note:** The "Available fields" shown in the output are the fields embedded in the PointCloud2 message. The "stamp" value displayed for each point is calculated from `header.stamp` and `t_us` field, representing the absolute timestamp of that point.
