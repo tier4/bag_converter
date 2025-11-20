@@ -86,7 +86,7 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
         
         # Read messages
         while reader.has_next():
-            (topic, data, _) = reader.read_next()
+            (topic, data, timestamp) = reader.read_next()
             
             # Filter by topic if needed
             if topic not in selected_topics:
@@ -119,10 +119,14 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
                 if 't_us' in points and len(points['t_us']) > 0:
                     base_time_us = msg.header.stamp.sec * 1_000_000 + msg.header.stamp.nanosec // 1_000
                 
+                # Convert timestamp from nanoseconds to seconds and nanoseconds
+                received_sec = timestamp // 1_000_000_000
+                received_nanosec = timestamp % 1_000_000_000
+                
                 print(f"\n[{topic}] Message #{message_count}")
                 print(f"  Scan started at: {msg.header.stamp.sec}.{msg.header.stamp.nanosec:09d}")
+                print(f"  Message received at: {received_sec}.{received_nanosec:09d}")
                 print(f"  Frame ID: {msg.header.frame_id}")
-                print(f"  Point cloud shape: {msg.width} x {msg.height} = {msg.width * msg.height} points")
                 print(f"  Number of points decoded: {num_points}")
                 print(f"  Available fields: {', '.join(field_names)}")
                 
@@ -279,7 +283,7 @@ Examples:
         type=int,
         default=100,
         metavar='N',
-        help='Maximum number of points to display per message (default: 100)'
+        help='Maximum number of points to display per message (default: 10)'
     )
     
     args = parser.parse_args()

@@ -26,6 +26,60 @@
 #include <string>
 #include <vector>
 
+inline constexpr double k_utc_offset_to_tai_sec = 37;
+inline constexpr double k_utc_offset_to_gps_sec = 18;
+inline constexpr double k_gps_offset_to_tai_sec = 19;
+inline constexpr double k_timescale_correction_tolerance_sec = 0.1;
+
+std::uint64_t correct_timescale(
+  std::uint64_t ref_time_ns, std::uint64_t time_ns_to_correct,
+  const std::string & ref_timescale = "utc")
+{
+  const double ref_time_sec = static_cast<double>(ref_time_ns) / 10e9;
+  const double time_sec_to_correct = static_cast<double>(time_ns_to_correct) / 10e9;
+  const auto diff = ref_time_sec - time_sec_to_correct;
+  if (ref_timescale == "utc") {
+    // ref: UTC, to-correct: TAI
+    if (
+      diff > (-k_utc_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
+      diff < (-k_utc_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
+      return time_ns_to_correct - static_cast<std::uint64_t>(k_utc_offset_to_tai_sec * 10e9);
+    }
+    // ref: UTC, to-correct: GPS
+    if (
+      diff > (-k_utc_offset_to_gps_sec - k_timescale_correction_tolerance_sec) &&
+      diff < (-k_utc_offset_to_gps_sec + k_timescale_correction_tolerance_sec)) {
+      return time_ns_to_correct - static_cast<std::uint64_t>(k_utc_offset_to_gps_sec * 10e9);
+    }
+  } else if (ref_timescale == "tai") {
+    // ref: TAI, to-correct: UTC
+    if (
+      diff > (k_utc_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
+      diff < (k_utc_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
+      return time_ns_to_correct + static_cast<std::uint64_t>(k_utc_offset_to_tai_sec * 10e9);
+    }
+    // ref: TAI, to-correct: GPS
+    if (
+      diff > (k_gps_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
+      diff < (k_gps_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
+      return time_ns_to_correct + static_cast<std::uint64_t>(k_gps_offset_to_tai_sec * 10e9);
+    }
+  } else if (ref_timescale == "gps") {
+    // ref: GPS, to-correct: UTC
+    if (
+      diff > (k_utc_offset_to_gps_sec - k_timescale_correction_tolerance_sec) &&
+      diff < (k_utc_offset_to_gps_sec + k_timescale_correction_tolerance_sec)) {
+      return time_ns_to_correct + static_cast<std::uint64_t>(k_utc_offset_to_gps_sec * 10e9);
+    }
+    // ref: GPS, to-correct: TAI
+    if (
+      diff > (-k_gps_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
+      diff < (-k_gps_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
+      return time_ns_to_correct - static_cast<std::uint64_t>(k_gps_offset_to_tai_sec * 10e9);
+    }
+  }
+  return time_ns_to_correct;
+}
 namespace fs = std::filesystem;
 
 // Point type definition
@@ -116,7 +170,8 @@ public:
         decoder_config.max_range = config_.max_range;
         decoder_config.calibration_file = config_.calibration_file;
 
-        // Extract sensor name from topic (e.g., /sensing/lidar/front/nebula_packets -> lidar_front)
+        // Extract sensor name from topic (e.g., /sensing/lidar/front/nebula_packets ->
+        // lidar_front)
         size_t last_slash = topic_metadata.name.rfind("/nebula_packets");
         if (last_slash != std::string::npos && last_slash > 0) {
           size_t second_last_slash = topic_metadata.name.rfind('/', last_slash - 1);
@@ -223,14 +278,23 @@ public:
 
       if (nebula_cloud && !nebula_cloud->empty()) {
         topic_conversion_success_counts[bag_msg->topic_name]++;
-        // Convet to PointCloud2 message
-        sensor_msgs::msg::PointCloud2 pc2_msg;
+
+        // NOTE: This is a temporary fix to compensate for the timescale diff between
+        // source nebula packets (timestamp is system clock) and output point cloud
+        // (timestamp is sensor clock).
+        const uint64_t system_time_ns = static_cast<uint64_t>(nebula_msg.header.stamp.sec * 1e9) +
+                                        nebula_msg.header.stamp.nanosec;
+        const uint64_t sensor_time_ns = nebula_cloud->header.stamp * 1000;
+        const auto sensor_time_ns_corrected =
+          correct_timescale(system_time_ns, sensor_time_ns, "utc");
+        nebula_cloud->header.stamp = sensor_time_ns_corrected / 1000;
+
+        // Convert to PointXYZIT for PCL conversion
         pcl::PointCloud<PointXYZIT> pc2_cloud;
         pc2_cloud.header = nebula_cloud->header;
         pc2_cloud.width = nebula_cloud->width;
         pc2_cloud.height = nebula_cloud->height;
         pc2_cloud.is_dense = nebula_cloud->is_dense;
-
         for (const auto & pt : nebula_cloud->points) {
           PointXYZIT pc2_pt;
           pc2_pt.x = pt.x;
@@ -240,13 +304,8 @@ public:
           pc2_pt.t_us = pt.time_stamp;
           pc2_cloud.push_back(pc2_pt);
         }
-
+        sensor_msgs::msg::PointCloud2 pc2_msg;
         pcl::toROSMsg(pc2_cloud, pc2_msg);
-
-        // Set header
-        pc2_msg.header.stamp.sec = pc2_cloud.header.stamp / 1000'000;
-        pc2_msg.header.stamp.nanosec = (pc2_cloud.header.stamp % 1000'000) * 1000;
-        pc2_msg.header.frame_id = decoder->GetConfig().frame_id;
 
         // Serialize and write to bag
         auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
