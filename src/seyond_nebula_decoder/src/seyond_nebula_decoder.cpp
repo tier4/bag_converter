@@ -112,7 +112,7 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
   return complete_cloud;
 }
 
-nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ConvertNebulaPackets(
+nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessNebulaPackets(
   const nebula_msgs::msg::NebulaPackets & packets)
 {
   std::vector<std::vector<uint8_t>> packet_data_vec;

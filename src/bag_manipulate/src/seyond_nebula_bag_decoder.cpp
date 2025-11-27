@@ -276,7 +276,7 @@ public:
       auto & decoder = decoders[bag_msg->topic_name];
 
       // Decode packets to point cloud directly using nebula_msgs
-      auto nebula_cloud = decoder->ConvertNebulaPackets(nebula_msg);
+      auto nebula_cloud = decoder->ProcessNebulaPackets(nebula_msg);
 
       if (nebula_cloud && !nebula_cloud->empty()) {
         topic_conversion_success_counts[bag_msg->topic_name]++;

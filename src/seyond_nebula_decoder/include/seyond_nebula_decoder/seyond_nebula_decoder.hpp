@@ -89,7 +89,7 @@ public:
   /// @brief Convert NebulaPackets message to point cloud
   /// @param packets Nebula packets container
   /// @return Nebula format point cloud
-  nebula::drivers::NebulaPointCloudPtr ConvertNebulaPackets(
+  nebula::drivers::NebulaPointCloudPtr ProcessNebulaPackets(
     const nebula_msgs::msg::NebulaPackets & packets);
 
   /// @brief Get current status

@@ -2,7 +2,7 @@ repositories:
   nebula_drs:
     type: git
     url: https://github.com/tier4/nebula_drs.git
-    version: v0.1.0
+    version: fd2a8954f9e4be70afe7b1124079c16992aab1e1  # feat/flush-buffered-cloud-points
   seyond_decoder/src/seyond_sdk:
     type: git
     url: https://github.com/Seyond-Inc/inno-lidar-sdk.git
