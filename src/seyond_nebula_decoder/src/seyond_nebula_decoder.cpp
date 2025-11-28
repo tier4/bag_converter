@@ -112,7 +112,7 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessPackets(
   return complete_cloud;
 }
 
-nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ConvertNebulaPackets(
+nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ProcessNebulaPackets(
   const nebula_msgs::msg::NebulaPackets & packets)
 {
   std::vector<std::vector<uint8_t>> packet_data_vec;
@@ -122,8 +122,24 @@ nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::ConvertNebulaPackets(
     packet_data_vec.push_back(packet.data);
   }
 
-  // Process all packets
   return ProcessPackets(packet_data_vec);
+}
+
+nebula::drivers::NebulaPointCloudPtr SeyondNebulaDecoder::FlushCloudPoints()
+{
+  if (status_ != nebula::Status::OK) {
+    std::cerr << "Driver status not OK (error code: " << status_ << ")" << std::endl;
+    return nullptr;
+  }
+
+  auto [cloud, cloud_timestamp] = driver_->FlushCloudPoints();
+
+  if (cloud && cloud_timestamp > 0) {
+    // Convert seconds to microseconds (PCL header.stamp is in microseconds)
+    cloud->header.stamp = static_cast<uint64_t>(cloud_timestamp * 1e6);
+    return cloud;
+  }
+  return nullptr;
 }
 
 void SeyondNebulaDecoder::SetConfig(const DecoderConfig & config)

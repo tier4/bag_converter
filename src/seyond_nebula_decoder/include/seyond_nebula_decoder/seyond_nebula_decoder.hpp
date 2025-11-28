@@ -89,8 +89,12 @@ public:
   /// @brief Convert NebulaPackets message to point cloud
   /// @param packets Nebula packets container
   /// @return Nebula format point cloud
-  nebula::drivers::NebulaPointCloudPtr ConvertNebulaPackets(
+  nebula::drivers::NebulaPointCloudPtr ProcessNebulaPackets(
     const nebula_msgs::msg::NebulaPackets & packets);
+
+  /// @brief Flush any remaining points in the decoder
+  /// @return Point cloud if available
+  nebula::drivers::NebulaPointCloudPtr FlushCloudPoints();
 
   /// @brief Get current status
   nebula::Status GetStatus() const { return status_; }
