@@ -29,7 +29,7 @@
 inline constexpr double k_utc_offset_to_tai_sec = 37;
 inline constexpr double k_utc_offset_to_gps_sec = 18;
 inline constexpr double k_gps_offset_to_tai_sec = 19;
-inline constexpr double k_timescale_correction_tolerance_sec = 1.0;
+inline constexpr double k_timescale_correction_tolerance_sec = 0.35;
 
 std::uint64_t correct_timescale(
   std::uint64_t ref_time_ns, std::uint64_t time_ns_to_correct,
@@ -130,7 +130,6 @@ public:
     // Open input bag
     rosbag2_storage::StorageOptions storage_options_in;
     storage_options_in.uri = config_.input_bag_path;
-    storage_options_in.storage_id = "mcap";
 
     rosbag2_cpp::Reader reader;
     try {
@@ -141,15 +140,15 @@ public:
     }
 
     // Get bag metadata
-    const auto metadata = reader.get_metadata();
+    const auto bag_metadata = reader.get_metadata();
 
     // Discover all nebula_packets topics to convert
-    std::map<std::string, std::string> nebula_topic_mapping;  // input_topic -> output_topic
+    std::map<std::string, std::string> topic_mapping;  // input_topic -> output_topic
     std::map<std::string, std::unique_ptr<seyond_nebula_decoder::SeyondNebulaDecoder>> decoders;
 
     std::cout << "Scanning for nebula packet topics..." << std::endl;
 
-    for (const auto & topic_info : metadata.topics_with_message_count) {
+    for (const auto & topic_info : bag_metadata.topics_with_message_count) {
       const auto & topic_metadata = topic_info.topic_metadata;
 
       // Check if this is a nebula packets topic
@@ -162,7 +161,7 @@ public:
           continue;
         }
         std::string converted_topic = topic_metadata.name.substr(0, pos) + "/nebula_points";
-        nebula_topic_mapping[topic_metadata.name] = converted_topic;
+        topic_mapping[topic_metadata.name] = converted_topic;
 
         // Create decoder for this topic with appropriate frame_id
         seyond_nebula_decoder::DecoderConfig decoder_config;
@@ -201,7 +200,7 @@ public:
       }
     }
 
-    if (nebula_topic_mapping.empty()) {
+    if (topic_mapping.empty()) {
       std::cout << "No nebula packet topics found in the input bag: " << config_.input_bag_path
                 << std::endl;
       return true;
@@ -210,7 +209,7 @@ public:
     // Prepare output bag
     rosbag2_storage::StorageOptions storage_options_out;
     storage_options_out.uri = config_.output_bag_path;
-    storage_options_out.storage_id = "mcap";
+    storage_options_out.storage_id = bag_metadata.storage_identifier;
 
     rosbag2_cpp::Writer writer;
     try {
@@ -221,12 +220,12 @@ public:
     }
 
     // Create topics in output bag
-    for (const auto & topic_info : metadata.topics_with_message_count) {
+    for (const auto & topic_info : bag_metadata.topics_with_message_count) {
       const auto & topic_metadata = topic_info.topic_metadata;
 
       // Check if this is a nebula topic to convert
-      auto it = nebula_topic_mapping.find(topic_metadata.name);
-      if (it != nebula_topic_mapping.end()) {
+      auto it = topic_mapping.find(topic_metadata.name);
+      if (it != topic_mapping.end()) {
         // Create converted point cloud topic
         rosbag2_storage::TopicMetadata pointcloud_topic_meta;
         pointcloud_topic_meta.name = it->second;
@@ -249,63 +248,13 @@ public:
     rclcpp::Serialization<sensor_msgs::msg::PointCloud2> pc2_serializer;
 
     std::map<std::string, size_t> topic_conversion_success_counts;
-    std::map<std::string, uint64_t> last_system_time_ns;  // Track last system time for each topic
-
-    // Helper function to process and write a nebula point cloud
-    auto process_and_write_cloud =
-      [&](
-        const std::string & input_topic, const std::string & output_topic,
-        nebula::drivers::NebulaPointCloudPtr nebula_cloud, const rclcpp::Time & timestamp,
-        bool apply_timescale_correction = false, uint64_t system_time_ns = 0) {
-        if (!nebula_cloud || nebula_cloud->empty()) {
-          return false;
-        }
-
-        // Apply timescale correction if requested
-        if (apply_timescale_correction && config_.enable_timescale_correction) {
-          const uint64_t sensor_time_ns = nebula_cloud->header.stamp * 1000;
-          const auto sensor_time_ns_corrected =
-            correct_timescale(system_time_ns, sensor_time_ns, config_.system_timescale);
-          nebula_cloud->header.stamp = sensor_time_ns_corrected / 1000;
-        }
-
-        // Convert to PointXYZIT for PCL conversion
-        pcl::PointCloud<PointXYZIT> pc2_cloud;
-        pc2_cloud.header = nebula_cloud->header;
-        pc2_cloud.header.frame_id = decoders[input_topic]->GetConfig().frame_id;
-        pc2_cloud.width = nebula_cloud->width;
-        pc2_cloud.height = nebula_cloud->height;
-        pc2_cloud.is_dense = nebula_cloud->is_dense;
-        for (const auto & pt : nebula_cloud->points) {
-          PointXYZIT pc2_pt;
-          pc2_pt.x = pt.x;
-          pc2_pt.y = pt.y;
-          pc2_pt.z = pt.z;
-          pc2_pt.intensity = pt.intensity;
-          pc2_pt.t_us = pt.time_stamp;
-          pc2_cloud.push_back(pc2_pt);
-        }
-
-        // Create PointCloud2 message
-        sensor_msgs::msg::PointCloud2 pc2_msg;
-        pcl::toROSMsg(pc2_cloud, pc2_msg);
-
-        // Serialize and write to bag
-        auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
-        pc2_serializer.serialize_message(&pc2_msg, pc2_msg_serialized.get());
-
-        // Write to bag file
-        writer.write(pc2_msg_serialized, output_topic, "sensor_msgs/msg/PointCloud2", timestamp);
-
-        return true;
-      };
 
     while (reader.has_next()) {
       auto bag_msg = reader.read_next();
 
       // Check if this is a nebula topic to convert
-      auto it = nebula_topic_mapping.find(bag_msg->topic_name);
-      if (it == nebula_topic_mapping.end()) {
+      auto it = topic_mapping.find(bag_msg->topic_name);
+      if (it == topic_mapping.end()) {
         // Write other messages as-is and continue
         writer.write(bag_msg);
         continue;
@@ -324,49 +273,64 @@ public:
       // Get decoder for this topic
       auto & decoder = decoders[bag_msg->topic_name];
 
-      // Decode packets to point cloud directly using nebula_msgs
-      auto nebula_cloud = decoder->ProcessNebulaPackets(nebula_msg);
-
-      // Calculate system time for timescale correction
-      const uint64_t system_time_ns =
-        static_cast<uint64_t>(nebula_msg.header.stamp.sec * 1e9) + nebula_msg.header.stamp.nanosec;
-
-      // Store the last system time for this topic (for use in flush)
-      last_system_time_ns[bag_msg->topic_name] = system_time_ns;
+      // Decode packets to point cloud
+      decoder->ProcessNebulaPackets(nebula_msg);
+      auto nebula_cloud = decoder->FlushCloudPoints();
+      if (!nebula_cloud || nebula_cloud->empty()) {
+        std::cerr << "A diagnostic packet found for topic " << bag_msg->topic_name << " (skipped)"
+                  << std::endl;
+        continue;
+      }
 
       // Process and write the cloud
-      if (process_and_write_cloud(
-            bag_msg->topic_name, it->second, nebula_cloud, rclcpp::Time(bag_msg->time_stamp),
-            true,  // apply timescale correction
-            system_time_ns)) {
-        topic_conversion_success_counts[bag_msg->topic_name]++;
+      const auto & input_topic = bag_msg->topic_name;
+      const auto & output_topic = it->second;
+      const rclcpp::Time receive_timestamp(bag_msg->time_stamp);
+
+      // Apply timescale correction
+      if (config_.enable_timescale_correction) {
+        const uint64_t sensor_time_ns = nebula_cloud->header.stamp * 1000;
+        const auto sensor_time_ns_corrected = correct_timescale(
+          receive_timestamp.nanoseconds(), sensor_time_ns, config_.system_timescale);
+        nebula_cloud->header.stamp = sensor_time_ns_corrected / 1000;
       }
-    }
 
-    // Flush remaining points from all decoders
-    for (const auto & [input_topic, output_topic] : nebula_topic_mapping) {
-      auto & decoder = decoders[input_topic];
-      auto nebula_cloud = decoder->FlushCloudPoints();
-
-      if (nebula_cloud && !nebula_cloud->empty()) {
-        // Use the cloud's timestamp for the message timestamp
-        // const uint64_t cloud_timestamp_ns = nebula_cloud->header.stamp * 1000;
-        const rclcpp::Time timestamp(last_system_time_ns[input_topic]);
-
-        // Process and write the flushed cloud with timescale correction based on last message
-        if (process_and_write_cloud(
-              input_topic, output_topic, nebula_cloud, timestamp,
-              true,  // apply timescale correction using last message timestamp
-              last_system_time_ns[input_topic])) {
-          topic_conversion_success_counts[input_topic]++;
-        }
+      // Convert to PointXYZIT for PCL conversion
+      pcl::PointCloud<PointXYZIT> pc2_cloud;
+      pc2_cloud.header = nebula_cloud->header;
+      pc2_cloud.header.frame_id = decoders[input_topic]->GetConfig().frame_id;
+      pc2_cloud.width = nebula_cloud->width;
+      pc2_cloud.height = nebula_cloud->height;
+      pc2_cloud.is_dense = nebula_cloud->is_dense;
+      for (const auto & pt : nebula_cloud->points) {
+        PointXYZIT pc2_pt;
+        pc2_pt.x = pt.x;
+        pc2_pt.y = pt.y;
+        pc2_pt.z = pt.z;
+        pc2_pt.intensity = pt.intensity;
+        pc2_pt.t_us = pt.time_stamp;
+        pc2_cloud.push_back(pc2_pt);
       }
+
+      // Create PointCloud2 message
+      sensor_msgs::msg::PointCloud2 pc2_msg;
+      pcl::toROSMsg(pc2_cloud, pc2_msg);
+
+      // Serialize and write to bag
+      auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
+      pc2_serializer.serialize_message(&pc2_msg, pc2_msg_serialized.get());
+
+      // Write to bag file
+      writer.write(
+        pc2_msg_serialized, output_topic, "sensor_msgs/msg/PointCloud2", receive_timestamp);
+
+      topic_conversion_success_counts[input_topic]++;
     }
 
     std::cout << "\n========== Conversion Summary ==========" << std::endl;
     for (const auto & [topic, count] : topic_conversion_success_counts) {
       std::cout << "[" << topic << "]" << std::endl;
-      std::cout << "    Destination topic: " << nebula_topic_mapping[topic] << std::endl;
+      std::cout << "    Destination topic: " << topic_mapping[topic] << std::endl;
       std::cout << "    Decoded: " << count << " messages" << std::endl;
     }
     std::cout << "========================================" << std::endl;
