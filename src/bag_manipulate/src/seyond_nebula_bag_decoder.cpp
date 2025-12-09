@@ -29,7 +29,7 @@
 inline constexpr double k_utc_offset_to_tai_sec = 37;
 inline constexpr double k_utc_offset_to_gps_sec = 18;
 inline constexpr double k_gps_offset_to_tai_sec = 19;
-inline constexpr double k_timescale_correction_tolerance_sec = 0.1;
+inline constexpr double k_timescale_correction_tolerance_sec = 1.0;
 
 std::uint64_t correct_timescale(
   std::uint64_t ref_time_ns, std::uint64_t time_ns_to_correct,
