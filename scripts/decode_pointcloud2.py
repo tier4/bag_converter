@@ -86,6 +86,11 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
         
         message_count = 0
         
+        # Store timestamps for interval statistics per topic
+        # Dictionary: topic_name -> list of timestamps
+        scan_timestamps_per_topic = {}  # topic -> list of scan timestamps in nanoseconds
+        receive_timestamps_per_topic = {}  # topic -> list of receive timestamps in nanoseconds
+        
         try:
             # Read messages
             while reader.has_next():
@@ -102,6 +107,17 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
                     continue
                 
                 message_count += 1
+                
+                # Initialize lists for this topic if not exists
+                if topic not in scan_timestamps_per_topic:
+                    scan_timestamps_per_topic[topic] = []
+                    receive_timestamps_per_topic[topic] = []
+                
+                # Store timestamps for interval calculation
+                # Scan time: convert from sec + nanosec to nanoseconds
+                scan_time_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
+                scan_timestamps_per_topic[topic].append(scan_time_ns)
+                receive_timestamps_per_topic[topic].append(timestamp)
                 
                 # Decode point cloud
                 points = decode_point(msg)
@@ -171,6 +187,45 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
                     time.sleep(delay)
             
             print(f"\nTotal messages processed: {message_count}")
+            
+            # Calculate and display timestamp interval statistics per topic
+            if scan_timestamps_per_topic:
+                print("\n" + "="*60)
+                print("Timestamp Interval Statistics (per topic)")
+                print("="*60)
+                
+                # Process each topic separately
+                for topic in sorted(scan_timestamps_per_topic.keys()):
+                    scan_timestamps = scan_timestamps_per_topic[topic]
+                    receive_timestamps = receive_timestamps_per_topic[topic]
+                    
+                    if len(scan_timestamps) <= 1:
+                        print(f"\n[{topic}]")
+                        print(f"  Not enough messages (need at least 2, got {len(scan_timestamps)})")
+                        continue
+                    
+                    # Calculate intervals in seconds
+                    scan_intervals = np.diff(np.array(scan_timestamps)) / 1e9  # Convert nanoseconds to seconds
+                    receive_intervals = np.diff(np.array(receive_timestamps)) / 1e9  # Convert nanoseconds to seconds
+                    
+                    print(f"\n[{topic}]")
+                    print(f"  Total messages: {len(scan_timestamps)}")
+                    
+                    # Scan time interval statistics
+                    print(f"  Scan Time Intervals:")
+                    print(f"    Minimum: {np.min(scan_intervals):.9f} seconds ({np.min(scan_intervals)*1000:.6f} ms)")
+                    print(f"    Maximum: {np.max(scan_intervals):.9f} seconds ({np.max(scan_intervals)*1000:.6f} ms)")
+                    print(f"    Average: {np.mean(scan_intervals):.9f} seconds ({np.mean(scan_intervals)*1000:.6f} ms)")
+                    print(f"    Std Dev: {np.std(scan_intervals):.9f} seconds ({np.std(scan_intervals)*1000:.6f} ms)")
+                    
+                    # Receive time interval statistics
+                    print(f"  Receive Time Intervals:")
+                    print(f"    Minimum: {np.min(receive_intervals):.9f} seconds ({np.min(receive_intervals)*1000:.6f} ms)")
+                    print(f"    Maximum: {np.max(receive_intervals):.9f} seconds ({np.max(receive_intervals)*1000:.6f} ms)")
+                    print(f"    Average: {np.mean(receive_intervals):.9f} seconds ({np.mean(receive_intervals)*1000:.6f} ms)")
+                    print(f"    Std Dev: {np.std(receive_intervals):.9f} seconds ({np.std(receive_intervals)*1000:.6f} ms)")
+                
+                print("="*60)
         except KeyboardInterrupt:
             print("\n\nTerminating safely....")
             print(f"Total messages processed: {message_count}")
