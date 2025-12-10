@@ -30,6 +30,7 @@ inline constexpr double k_utc_offset_to_tai_sec = 37;
 inline constexpr double k_utc_offset_to_gps_sec = 18;
 inline constexpr double k_gps_offset_to_tai_sec = 19;
 inline constexpr double k_timescale_correction_tolerance_sec = 0.35;
+inline constexpr size_t k_min_points_per_scan = 1000;
 
 std::uint64_t correct_timescale(
   std::uint64_t ref_time_ns, std::uint64_t time_ns_to_correct,
@@ -276,8 +277,10 @@ public:
       // Decode packets to point cloud
       decoder->ProcessNebulaPackets(nebula_msg);
       auto nebula_cloud = decoder->FlushCloudPoints();
-      if (!nebula_cloud || nebula_cloud->empty()) {
-        std::cerr << "A diagnostic packet found for topic " << bag_msg->topic_name << " (skipped)"
+      if (
+        !nebula_cloud || nebula_cloud->empty() ||
+        nebula_cloud->points.size() <= k_min_points_per_scan) {
+        std::cerr << "A diagnostic packet found in topic " << bag_msg->topic_name << " (skipped)"
                   << std::endl;
         continue;
       }
