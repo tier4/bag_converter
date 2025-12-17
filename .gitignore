@@ -14,9 +14,9 @@ install/
 log/
 
 # Dependencies
-/src/nebula_drs/
+/src/dependencies/nebula_drs/
 /src/seyond_decoder/src/seyond_sdk/
-/src/oxts_ros2_driver/
+/src/dependencies/oxts_ros2_driver/
 
 # rosbags
 *.mcap
