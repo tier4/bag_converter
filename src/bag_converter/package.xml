@@ -3,8 +3,8 @@
 <package format="3">
   <name>bag_converter</name>
   <version>0.1.0</version>
-  <description>ROS2 bag manipulation tool</description>
-  <maintainer email="your_email@example.com">Your Name</maintainer>
+  <description>PointCloud2 decoder for Seyond LiDAR data in rosbag2 format</description>
+  <maintainer email="mineto.tsukada@tier4.jp">Mineto Tsukada</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
