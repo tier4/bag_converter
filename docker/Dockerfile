@@ -75,13 +75,13 @@ RUN rosdep init && \
     rosdep update && \
     apt update && \
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
-    colcon list --packages-up-to bag_manipulate oxts_msgs | awk '{print $2}' | xargs rosdep install -iry --from-paths && \
+    colcon list --packages-up-to app oxts_msgs | awk '{print $2}' | xargs rosdep install -iry --from-paths && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Build ROS packages
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
-    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to bag_manipulate oxts_msgs
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to app oxts_msgs
 
 # Set env var
 ENV ROS_DISTRO=${ROS_DISTRO}

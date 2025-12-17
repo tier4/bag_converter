@@ -43,6 +43,6 @@ docker run -it --rm \
     -v "$INPUT_DIR":/input \
     -v "$OUTPUT_DIR":/output \
     bag_converter:latest \
-    ros2 run bag_manipulate seyond_nebula_bag_decoder /input/$INPUT_FILE /output/tmp
+    ros2 run app seyond_nebula_bag_decoder /input/$INPUT_FILE /output/tmp
 mv $OUTPUT_DIR/tmp/tmp_0.mcap $OUTPUT_DIR/$OUTPUT_FILE
 rm -rf $OUTPUT_DIR/tmp
