@@ -36,6 +36,7 @@ add_executable(seyond_bag_decoder
 )
 
 target_include_directories(seyond_bag_decoder PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${seyond_decoder_INCLUDE_DIRS}
 )
 
@@ -61,6 +62,7 @@ add_executable(seyond_nebula_bag_decoder
 )
 
 target_include_directories(seyond_nebula_bag_decoder PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${seyond_nebula_decoder_INCLUDE_DIRS}
 )
 
@@ -82,6 +84,11 @@ ament_target_dependencies(seyond_nebula_bag_decoder
 
 install(TARGETS seyond_nebula_bag_decoder
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install header files
+install(DIRECTORY include/
+  DESTINATION include
 )
 
 if(BUILD_TESTING)

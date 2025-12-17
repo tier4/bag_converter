@@ -3,6 +3,8 @@
  * @brief Decode Seyond LiDAR nebula packets from rosbag and convert to point clouds
  */
 
+#include "point_types.hpp"
+
 #include <builtin_interfaces/msg/time.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/serialization.hpp>
@@ -82,19 +84,6 @@ std::uint64_t correct_timescale(
   return time_ns_to_correct;
 }
 namespace fs = std::filesystem;
-
-// Point type definition
-struct EIGEN_ALIGN16 PointXYZIT
-{
-  PCL_ADD_POINT4D;
-  float intensity;
-  uint32_t t_us;
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-};
-
-POINT_CLOUD_REGISTER_POINT_STRUCT(
-  PointXYZIT,
-  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us))
 
 class SeyondNebulaBagDecoder
 {
@@ -299,14 +288,14 @@ public:
       }
 
       // Convert to PointXYZIT for PCL conversion
-      pcl::PointCloud<PointXYZIT> pc2_cloud;
+      pcl::PointCloud<bag_converter::PointXYZIT> pc2_cloud;
       pc2_cloud.header = nebula_cloud->header;
       pc2_cloud.header.frame_id = decoders[input_topic]->GetConfig().frame_id;
       pc2_cloud.width = nebula_cloud->width;
       pc2_cloud.height = nebula_cloud->height;
       pc2_cloud.is_dense = nebula_cloud->is_dense;
       for (const auto & pt : nebula_cloud->points) {
-        PointXYZIT pc2_pt;
+        bag_converter::PointXYZIT pc2_pt;
         pc2_pt.x = pt.x;
         pc2_pt.y = pt.y;
         pc2_pt.z = pt.z;
