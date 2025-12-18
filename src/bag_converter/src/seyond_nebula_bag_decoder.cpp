@@ -287,14 +287,14 @@ public:
       }
 
       // Convert to PointXYZIT for PCL conversion
-      pcl::PointCloud<bag_converter::PointXYZIT> pc2_cloud;
+      pcl::PointCloud<bag_converter::point::PointXYZIT> pc2_cloud;
       pc2_cloud.header = nebula_cloud->header;
       pc2_cloud.header.frame_id = decoders[input_topic]->get_config().frame_id;
       pc2_cloud.width = nebula_cloud->width;
       pc2_cloud.height = nebula_cloud->height;
       pc2_cloud.is_dense = nebula_cloud->is_dense;
       for (const auto & pt : nebula_cloud->points) {
-        bag_converter::PointXYZIT pc2_pt;
+        bag_converter::point::PointXYZIT pc2_pt;
         pc2_pt.x = pt.x;
         pc2_pt.y = pt.y;
         pc2_pt.z = pt.z;

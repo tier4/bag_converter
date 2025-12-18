@@ -82,7 +82,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder::decode(
   }
 
   // Convert NebulaPointCloud to PointXYZIT for PCL conversion
-  pcl::PointCloud<PointXYZIT> pc2_cloud;
+  pcl::PointCloud<bag_converter::point::PointXYZIT> pc2_cloud;
   pc2_cloud.header = nebula_cloud->header;
   pc2_cloud.header.frame_id = config_.frame_id;
   pc2_cloud.width = nebula_cloud->width;
@@ -90,7 +90,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder::decode(
   pc2_cloud.is_dense = nebula_cloud->is_dense;
 
   for (const auto & pt : nebula_cloud->points) {
-    PointXYZIT pc2_pt;
+    bag_converter::point::PointXYZIT pc2_pt;
     pc2_pt.x = pt.x;
     pc2_pt.y = pt.y;
     pc2_pt.z = pt.z;

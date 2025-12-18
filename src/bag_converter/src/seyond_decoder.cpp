@@ -33,7 +33,7 @@ SeyondPCDDecoder::~SeyondPCDDecoder() = default;
 sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder::decode(
   const seyond_decoder::msg::SeyondScan & input)
 {
-  pcl::PointCloud<PointXYZIT> cloud;
+  pcl::PointCloud<bag_converter::point::PointXYZIT> cloud;
   cloud.header.frame_id = input.header.frame_id.empty() ? config_.frame_id : input.header.frame_id;
   cloud.header.stamp =
     input.header.stamp.sec * 1000000ULL + input.header.stamp.nanosec / 1000;
@@ -130,7 +130,7 @@ void SeyondPCDDecoder::point_xyz_data_parse(
       continue;
     }
 
-    PointXYZIT point;
+    bag_converter::point::PointXYZIT point;
 
     // Set intensity based on point type and configuration
     if constexpr (std::is_same<PointType, const InnoEnXyzPoint *>::value) {
@@ -157,7 +157,7 @@ void SeyondPCDDecoder::point_xyz_data_parse(
 }
 
 void SeyondPCDDecoder::coordinate_transfer(
-  PointXYZIT * point, int mode, float x, float y, float z)
+  bag_converter::point::PointXYZIT * point, int mode, float x, float y, float z)
 {
   switch (mode) {
     case 0:
@@ -218,9 +218,9 @@ void SeyondPCDDecoder::clear_angle_hv_table()
 
 // Explicit template instantiations
 template void SeyondPCDDecoder::point_xyz_data_parse<const InnoEnXyzPoint *>(
-  bool, uint32_t, const InnoEnXyzPoint *, pcl::PointCloud<PointXYZIT> &);
+  bool, uint32_t, const InnoEnXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIT> &);
 template void SeyondPCDDecoder::point_xyz_data_parse<const InnoXyzPoint *>(
-  bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<PointXYZIT> &);
+  bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIT> &);
 
 }  // namespace bag_converter::decoder
 

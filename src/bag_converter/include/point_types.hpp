@@ -11,7 +11,7 @@
 
 #include <pcl/point_types.h>
 
-namespace bag_converter
+namespace bag_converter::point
 {
 
 /**
@@ -46,14 +46,15 @@ struct EIGEN_ALIGN16 PointXYZIT
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-}  // namespace bag_converter
+}  // namespace bag_converter::point
 
 // Register point types with PCL
 POINT_CLOUD_REGISTER_POINT_STRUCT(
-  bag_converter::PointXYZI, (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity))
+  bag_converter::point::PointXYZI,
+  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity))
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
-  bag_converter::PointXYZIT,
+  bag_converter::point::PointXYZIT,
   (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP

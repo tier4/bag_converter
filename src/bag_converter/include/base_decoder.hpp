@@ -29,9 +29,9 @@ namespace bag_converter::decoder
  *
  * @tparam InputScanMessage The input scan message type to be decoded
  * @tparam OutputPoint The point type used internally for point cloud processing
- * (default: bag_converter::PointXYZIT)
+ * (default: bag_converter::point::PointXYZIT)
  */
-template <typename InputScanMessage, typename OutputPoint = bag_converter::PointXYZIT>
+template <typename InputScanMessage, typename OutputPoint = bag_converter::point::PointXYZIT>
 class PCDDecoder
 {
 public:
