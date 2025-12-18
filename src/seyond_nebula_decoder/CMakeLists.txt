@@ -23,6 +23,8 @@ find_package(nebula_decoders REQUIRED)
 find_package(nebula_common REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 # Include directories
 include_directories(
@@ -41,6 +43,7 @@ add_library(${PROJECT_NAME}_lib SHARED
 target_include_directories(${PROJECT_NAME}_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../bag_converter/include>
 )
 
 target_link_libraries(${PROJECT_NAME}_lib
@@ -53,6 +56,8 @@ ament_target_dependencies(${PROJECT_NAME}_lib
   nebula_common
   builtin_interfaces
   rclcpp
+  pcl_conversions
+  sensor_msgs
 )
 
 # Export library

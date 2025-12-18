@@ -4,6 +4,7 @@
  */
 
 #include "point_types.hpp"
+#include "nebula_decoder.hpp"
 
 #include <builtin_interfaces/msg/time.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -11,7 +12,6 @@
 #include <rosbag2_cpp/reader.hpp>
 #include <rosbag2_cpp/writer.hpp>
 #include <rosbag2_storage/storage_options.hpp>
-#include <seyond_nebula_decoder/seyond_nebula_decoder.hpp>
 
 #include <nebula_msgs/msg/nebula_packet.hpp>
 #include <nebula_msgs/msg/nebula_packets.hpp>
@@ -134,7 +134,7 @@ public:
 
     // Discover all nebula_packets topics to convert
     std::map<std::string, std::string> topic_mapping;  // input_topic -> output_topic
-    std::map<std::string, std::unique_ptr<seyond_nebula_decoder::SeyondNebulaDecoder>> decoders;
+    std::map<std::string, std::unique_ptr<bag_converter::decoder::NebulaPCDDecoder>> decoders;
 
     std::cout << "Scanning for nebula packet topics..." << std::endl;
 
@@ -154,12 +154,11 @@ public:
         topic_mapping[topic_metadata.name] = converted_topic;
 
         // Create decoder for this topic with appropriate frame_id
-        seyond_nebula_decoder::DecoderConfig decoder_config;
+        bag_converter::decoder::NebulaPCDDecoderConfig decoder_config;
         decoder_config.sensor_model = config_.sensor_model;
         decoder_config.return_mode = config_.return_mode;
         decoder_config.min_range = config_.min_range;
         decoder_config.max_range = config_.max_range;
-        decoder_config.calibration_file = config_.calibration_file;
 
         // Extract sensor name from topic (e.g., /sensing/lidar/front/nebula_packets ->
         // lidar_front)
@@ -179,7 +178,7 @@ public:
         }
 
         decoders[topic_metadata.name] =
-          std::make_unique<seyond_nebula_decoder::SeyondNebulaDecoder>(decoder_config);
+          std::make_unique<bag_converter::decoder::NebulaPCDDecoder>(decoder_config);
 
         std::cout << "Found a decodable topic: " << topic_metadata.name
                   << " (sensor_model: " << decoder_config.sensor_model
@@ -264,8 +263,8 @@ public:
       auto & decoder = decoders[bag_msg->topic_name];
 
       // Decode packets to point cloud
-      decoder->ProcessNebulaPackets(nebula_msg);
-      auto nebula_cloud = decoder->FlushCloudPoints();
+      decoder->process_nebula_packets(nebula_msg);
+      auto nebula_cloud = decoder->flush_cloud_points();
       if (
         !nebula_cloud || nebula_cloud->empty() ||
         nebula_cloud->points.size() <= k_min_points_per_scan) {
@@ -290,7 +289,7 @@ public:
       // Convert to PointXYZIT for PCL conversion
       pcl::PointCloud<bag_converter::PointXYZIT> pc2_cloud;
       pc2_cloud.header = nebula_cloud->header;
-      pc2_cloud.header.frame_id = decoders[input_topic]->GetConfig().frame_id;
+      pc2_cloud.header.frame_id = decoders[input_topic]->get_config().frame_id;
       pc2_cloud.width = nebula_cloud->width;
       pc2_cloud.height = nebula_cloud->height;
       pc2_cloud.is_dense = nebula_cloud->is_dense;

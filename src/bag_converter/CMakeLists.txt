@@ -25,8 +25,11 @@ find_package(sensor_msgs REQUIRED)
 find_package(nebula_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(seyond_decoder REQUIRED)
-find_package(seyond_nebula_decoder REQUIRED)
+find_package(nebula_decoders REQUIRED)
+find_package(nebula_common REQUIRED)
 find_package(pcl_conversions REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common io)
+find_package(Eigen3 REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 
 
@@ -59,15 +62,19 @@ install(TARGETS seyond_bag_decoder
 # Build seyond_nebula_bag_decoder executable
 add_executable(seyond_nebula_bag_decoder
   src/seyond_nebula_bag_decoder.cpp
+  src/nebula_decoder.cpp
 )
 
 target_include_directories(seyond_nebula_bag_decoder PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${seyond_nebula_decoder_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
+  ${nebula_decoders_INCLUDE_DIRS}
+  ${nebula_common_INCLUDE_DIRS}
 )
 
 target_link_libraries(seyond_nebula_bag_decoder
-  seyond_nebula_decoder::seyond_nebula_decoder_lib
+  ${PCL_LIBRARIES}
 )
 
 ament_target_dependencies(seyond_nebula_bag_decoder
@@ -79,7 +86,8 @@ ament_target_dependencies(seyond_nebula_bag_decoder
   rosbag2_cpp
   rosbag2_storage
   pcl_conversions
-  seyond_nebula_decoder
+  nebula_decoders
+  nebula_common
 )
 
 install(TARGETS seyond_nebula_bag_decoder

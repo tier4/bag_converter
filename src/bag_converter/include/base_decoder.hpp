@@ -18,7 +18,7 @@
 
 #include <memory>
 
-namespace bag_converter
+namespace bag_converter::decoder
 {
 
 /**
@@ -35,6 +35,7 @@ template <typename InputScanMessage, typename OutputPoint = bag_converter::Point
 class PCDDecoder
 {
 public:
+  PCDDecoder() = default;
   virtual ~PCDDecoder() = default;
 
   // Disable copy and move operations for abstract base class
@@ -54,6 +55,7 @@ public:
    */
   virtual sensor_msgs::msg::PointCloud2::SharedPtr decode(const InputScanMessage & input) = 0;
 };
-}  // namespace bag_converter
+
+}  // namespace bag_converter::decoder
 
 #endif  // BAG_CONVERTER__PCD_DECODER_HPP
