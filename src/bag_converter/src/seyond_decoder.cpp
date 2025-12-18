@@ -34,7 +34,7 @@ template <typename OutputPointT>
 SeyondPCDDecoder<OutputPointT>::~SeyondPCDDecoder() = default;
 
 template <typename OutputPointT>
-sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode(
+sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_typed(
   const bag_converter::msg::SeyondScan & input)
 {
   // Create point cloud for processing

@@ -73,7 +73,7 @@ template <typename OutputPointT>
 NebulaPCDDecoder<OutputPointT>::~NebulaPCDDecoder() = default;
 
 template <typename OutputPointT>
-sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode(
+sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_typed(
   const nebula_msgs::msg::NebulaPackets & input)
 {
   // Process NebulaPackets

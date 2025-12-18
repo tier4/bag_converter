@@ -132,6 +132,61 @@ bool parse_arguments(int argc, char ** argv, Config & config)
   return true;
 }
 
+/**
+ * @brief Create a Nebula decoder for the given topic
+ */
+template <typename PointT>
+std::unique_ptr<decoder::BasePCDDecoder> create_nebula_decoder(
+  const std::string & topic_name, const Config & config,
+  std::map<std::string, std::pair<std::string, size_t>> & conversion_counts)
+{
+  decoder::nebula::NebulaPCDDecoderConfig decoder_config;
+  decoder_config.min_range = config.min_range;
+  decoder_config.max_range = config.max_range;
+
+  auto [frame_id, sensor_model] =
+    extract_sensor_info(topic_name, "/nebula_packets", config.frame_id);
+  decoder_config.frame_id = frame_id;
+  decoder_config.sensor_model = sensor_model;
+
+  std::string output_topic = generate_output_topic(topic_name, "/nebula_packets", "/nebula_points");
+  conversion_counts[topic_name] = {output_topic, 0};
+
+  RCLCPP_INFO(
+    logger, "Found NebulaPackets topic: %s -> %s (sensor_model: %s, frame_id: %s)",
+    topic_name.c_str(), output_topic.c_str(), decoder_config.sensor_model.c_str(),
+    decoder_config.frame_id.c_str());
+
+  return std::make_unique<decoder::nebula::NebulaPCDDecoder<PointT>>(decoder_config);
+}
+
+/**
+ * @brief Create a Seyond decoder for the given topic
+ */
+template <typename PointT>
+std::unique_ptr<decoder::BasePCDDecoder> create_seyond_decoder(
+  const std::string & topic_name, const Config & config,
+  std::map<std::string, std::pair<std::string, size_t>> & conversion_counts)
+{
+  decoder::seyond::SeyondPCDDecoderConfig decoder_config;
+  decoder_config.min_range = config.min_range;
+  decoder_config.max_range = config.max_range;
+  decoder_config.coordinate_mode = config.coordinate_mode;
+  decoder_config.use_reflectance = config.use_reflectance;
+
+  auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
+  decoder_config.frame_id = frame_id;
+
+  std::string output_topic = generate_output_topic(topic_name, "/seyond_packets", "/seyond_points");
+  conversion_counts[topic_name] = {output_topic, 0};
+
+  RCLCPP_INFO(
+    logger, "Found SeyondScan topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
+    output_topic.c_str(), decoder_config.frame_id.c_str());
+
+  return std::make_unique<decoder::seyond::SeyondPCDDecoder<PointT>>(decoder_config);
+}
+
 template <typename PointT>
 int run_impl(const Config & config)
 {
@@ -187,9 +242,11 @@ int run_impl(const Config & config)
       // Create point cloud output topic
       std::string output_topic;
       if (is_nebula) {
-        output_topic = generate_output_topic(topic_metadata.name, "/nebula_packets", "/nebula_points");
+        output_topic =
+          generate_output_topic(topic_metadata.name, "/nebula_packets", "/nebula_points");
       } else {
-        output_topic = generate_output_topic(topic_metadata.name, "/seyond_packets", "/seyond_points");
+        output_topic =
+          generate_output_topic(topic_metadata.name, "/seyond_packets", "/seyond_points");
       }
 
       rosbag2_storage::TopicMetadata pc_topic_meta;
@@ -209,14 +266,11 @@ int run_impl(const Config & config)
     }
   }
 
-  // Serializers
-  rclcpp::Serialization<nebula_msgs::msg::NebulaPackets> nebula_serializer;
-  rclcpp::Serialization<msg::SeyondScan> seyond_serializer;
+  // Serializer for output PointCloud2
   rclcpp::Serialization<sensor_msgs::msg::PointCloud2> pc2_serializer;
 
-  // Decoders (created on-demand per topic)
-  std::map<std::string, std::unique_ptr<decoder::nebula::NebulaPCDDecoder<PointT>>> nebula_decoders;
-  std::map<std::string, std::unique_ptr<decoder::seyond::SeyondPCDDecoder<PointT>>> seyond_decoders;
+  // Unified decoder map using polymorphism (type erasure pattern)
+  std::map<std::string, std::unique_ptr<decoder::BasePCDDecoder>> decoders;
 
   // Topic output mapping and conversion counts: input_topic -> (output_topic, count)
   std::map<std::string, std::pair<std::string, size_t>> conversion_counts;
@@ -238,109 +292,51 @@ int run_impl(const Config & config)
 
     const auto & topic_type = type_it->second;
 
-    // Handle NebulaPackets
-    if (topic_type == "nebula_msgs/msg/NebulaPackets") {
-      if (config.keep_original_topics) {
-        writer.write(bag_msg);
-      }
+    bool is_nebula = (topic_type == "nebula_msgs/msg/NebulaPackets");
+    bool is_seyond =
+      (topic_type == "seyond/msg/SeyondScan" || topic_type == "bag_converter/msg/SeyondScan");
 
-      // Create decoder on first encounter
-      if (nebula_decoders.find(topic_name) == nebula_decoders.end()) {
-        decoder::nebula::NebulaPCDDecoderConfig decoder_config;
-        decoder_config.min_range = config.min_range;
-        decoder_config.max_range = config.max_range;
+    if (!is_nebula && !is_seyond) {
+      // Other messages: pass through
+      writer.write(bag_msg);
 
-        auto [frame_id, sensor_model] =
-          extract_sensor_info(topic_name, "/nebula_packets", config.frame_id);
-        decoder_config.frame_id = frame_id;
-        decoder_config.sensor_model = sensor_model;
-
-        nebula_decoders[topic_name] =
-          std::make_unique<decoder::nebula::NebulaPCDDecoder<PointT>>(decoder_config);
-
-        std::string output_topic =
-          generate_output_topic(topic_name, "/nebula_packets", "/nebula_points");
-        conversion_counts[topic_name] = {output_topic, 0};
-
-        RCLCPP_INFO(
-          logger, "Found NebulaPackets topic: %s -> %s (sensor_model: %s, frame_id: %s)",
-          topic_name.c_str(), output_topic.c_str(), decoder_config.sensor_model.c_str(),
-          decoder_config.frame_id.c_str());
-      }
-
-      // Decode
-      rclcpp::SerializedMessage serialized_msg(*bag_msg->serialized_data);
-      nebula_msgs::msg::NebulaPackets nebula_msg;
-      nebula_serializer.deserialize_message(&serialized_msg, &nebula_msg);
-
-      auto & decoder = nebula_decoders[topic_name];
-      auto pointcloud_msg = decoder->decode(nebula_msg);
-
-      if (pointcloud_msg) {
-        auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
-        pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
-
-        writer.write(
-          pc2_msg_serialized, conversion_counts[topic_name].first, "sensor_msgs/msg/PointCloud2",
-          rclcpp::Time(bag_msg->time_stamp));
-
-        conversion_counts[topic_name].second++;
+      if (message_count % 1000 == 0) {
+        RCLCPP_INFO(logger, "Processed %zu messages...", message_count);
       }
       continue;
     }
 
-    // Handle SeyondScan
-    if (topic_type == "seyond/msg/SeyondScan" || topic_type == "bag_converter/msg/SeyondScan") {
-      if (config.keep_original_topics) {
-        writer.write(bag_msg);
-      }
-
-      // Create decoder on first encounter
-      if (seyond_decoders.find(topic_name) == seyond_decoders.end()) {
-        decoder::seyond::SeyondPCDDecoderConfig decoder_config;
-        decoder_config.min_range = config.min_range;
-        decoder_config.max_range = config.max_range;
-        decoder_config.coordinate_mode = config.coordinate_mode;
-        decoder_config.use_reflectance = config.use_reflectance;
-
-        auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
-        decoder_config.frame_id = frame_id;
-
-        seyond_decoders[topic_name] =
-          std::make_unique<decoder::seyond::SeyondPCDDecoder<PointT>>(decoder_config);
-
-        std::string output_topic =
-          generate_output_topic(topic_name, "/seyond_packets", "/seyond_points");
-        conversion_counts[topic_name] = {output_topic, 0};
-
-        RCLCPP_INFO(
-          logger, "Found SeyondScan topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
-          output_topic.c_str(), decoder_config.frame_id.c_str());
-      }
-
-      // Decode
-      rclcpp::SerializedMessage serialized_msg(*bag_msg->serialized_data);
-      bag_converter::msg::SeyondScan scan_msg;
-      seyond_serializer.deserialize_message(&serialized_msg, &scan_msg);
-
-      auto & decoder = seyond_decoders[topic_name];
-      auto pointcloud_msg = decoder->decode(scan_msg);
-
-      if (pointcloud_msg) {
-        auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
-        pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
-
-        writer.write(
-          pc2_msg_serialized, conversion_counts[topic_name].first, "sensor_msgs/msg/PointCloud2",
-          rclcpp::Time(bag_msg->time_stamp));
-
-        conversion_counts[topic_name].second++;
-      }
-      continue;
+    // Keep original if requested
+    if (config.keep_original_topics) {
+      writer.write(bag_msg);
     }
 
-    // Other messages: pass through
-    writer.write(bag_msg);
+    // Create decoder on first encounter
+    if (decoders.find(topic_name) == decoders.end()) {
+      if (is_nebula) {
+        decoders[topic_name] =
+          create_nebula_decoder<PointT>(topic_name, config, conversion_counts);
+      } else {
+        decoders[topic_name] =
+          create_seyond_decoder<PointT>(topic_name, config, conversion_counts);
+      }
+    }
+
+    // Decode using polymorphic interface
+    rclcpp::SerializedMessage serialized_msg(*bag_msg->serialized_data);
+    auto & decoder = decoders[topic_name];
+    auto pointcloud_msg = decoder->decode(serialized_msg);
+
+    if (pointcloud_msg) {
+      auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
+      pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
+
+      writer.write(
+        pc2_msg_serialized, conversion_counts[topic_name].first, "sensor_msgs/msg/PointCloud2",
+        rclcpp::Time(bag_msg->time_stamp));
+
+      conversion_counts[topic_name].second++;
+    }
 
     if (message_count % 1000 == 0) {
       RCLCPP_INFO(logger, "Processed %zu messages...", message_count);

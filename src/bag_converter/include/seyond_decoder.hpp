@@ -92,7 +92,7 @@ public:
    * @param input The SeyondScan message to decode
    * @return Shared pointer to PointCloud2 message, or nullptr if decoding fails
    */
-  sensor_msgs::msg::PointCloud2::SharedPtr decode(
+  sensor_msgs::msg::PointCloud2::SharedPtr decode_typed(
     const bag_converter::msg::SeyondScan & input) override;
 
   /**
