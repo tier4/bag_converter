@@ -47,7 +47,6 @@ namespace bag_converter::decoder::nebula
 namespace defaults
 {
 inline constexpr const char * sensor_model = "Falcon";
-inline constexpr const char * return_mode = "Dual";
 inline constexpr const char * frame_id = "seyond";
 inline constexpr double min_range = 0.3;
 inline constexpr double max_range = 200.0;
@@ -66,7 +65,6 @@ struct NebulaPCDDecoderConfig
 {
   // Sensor configuration
   std::string sensor_model = defaults::sensor_model;  // or "Robin_W"
-  std::string return_mode = defaults::return_mode;
   std::string frame_id = defaults::frame_id;
 
   // Range filtering (will be set in sensor config)

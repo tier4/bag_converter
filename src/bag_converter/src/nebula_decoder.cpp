@@ -36,9 +36,8 @@ NebulaPCDDecoder<OutputPointT>::NebulaPCDDecoder(const NebulaPCDDecoderConfig & 
   sensor_config_->gnss_port = defaults::dummy_gnss_port;
   sensor_config_->packet_mtu_size = defaults::dummy_packet_mtu_size;
 
-  // Set sensor model and return mode
+  // Set sensor model
   sensor_config_->sensor_model = ::nebula::drivers::SensorModelFromString(config.sensor_model);
-  sensor_config_->return_mode = ::nebula::drivers::ReturnModeFromString(config.return_mode);
 
   // Set other parameters
   sensor_config_->frame_id = config.frame_id;
@@ -204,7 +203,6 @@ void NebulaPCDDecoder<OutputPointT>::set_config(const NebulaPCDDecoderConfig & c
 
   // Update sensor configuration
   sensor_config_->sensor_model = ::nebula::drivers::SensorModelFromString(config.sensor_model);
-  sensor_config_->return_mode = ::nebula::drivers::ReturnModeFromString(config.return_mode);
   sensor_config_->frame_id = config.frame_id;
   sensor_config_->scan_phase = config.scan_phase;
   sensor_config_->frequency_ms = static_cast<uint16_t>(config.frequency_ms);

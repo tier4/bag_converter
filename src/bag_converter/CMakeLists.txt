@@ -15,6 +15,8 @@ elseif(CMAKE_CXX_STANDARD LESS 17)
   message(FATAL_ERROR "CMAKE_CXX_STANDARD must be 17 or higher (got ${CMAKE_CXX_STANDARD})")
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 find_package(rosbag2_storage REQUIRED)
@@ -24,7 +26,6 @@ find_package(rcutils REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nebula_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(seyond_decoder REQUIRED)
 find_package(nebula_decoders REQUIRED)
 find_package(nebula_common REQUIRED)
 find_package(pcl_conversions REQUIRED)
@@ -32,54 +33,60 @@ find_package(PCL REQUIRED COMPONENTS common io)
 find_package(Eigen3 REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 
+# Generate Seyond messages
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/SeyondPacket.msg"
+  "msg/SeyondScan.msg"
+  DEPENDENCIES builtin_interfaces std_msgs
+)
 
-# Build seyond_bag_decoder executable
-add_executable(seyond_bag_decoder
-  src/seyond_bag_decoder.cpp
+# Seyond SDK paths
+set(SEYOND_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/seyond_sdk)
+set(SEYOND_SDK_LIB_PATH ${SEYOND_SDK_PATH}/lib/libinnolidarsdkclient.a)
+
+# Build Seyond SDK if needed
+if(NOT EXISTS ${SEYOND_SDK_LIB_PATH})
+  message(STATUS "Seyond SDK not built yet. Building it now...")
+  execute_process(
+    COMMAND bash -c "cd ${SEYOND_SDK_PATH}/build && ./build_unix.sh"
+    RESULT_VARIABLE SDK_BUILD_RESULT
+  )
+  if(NOT SDK_BUILD_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to build Seyond SDK")
+  endif()
+endif()
+
+
+# Get message typesupport target
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} rosidl_typesupport_cpp)
+
+# Build unified bag_converter executable
+add_executable(bag_converter_bin
+  src/bag_converter.cpp
   src/seyond_decoder.cpp
-)
-
-target_include_directories(seyond_bag_decoder PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${seyond_decoder_INCLUDE_DIRS}
-)
-
-target_link_libraries(seyond_bag_decoder
-  seyond_decoder::seyond_decoder_lib
-)
-
-ament_target_dependencies(seyond_bag_decoder
-  rclcpp
-  sensor_msgs
-  rosbag2_cpp
-  rosbag2_storage
-  seyond_decoder
-)
-
-install(TARGETS seyond_bag_decoder
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-# Build seyond_nebula_bag_decoder executable
-add_executable(seyond_nebula_bag_decoder
-  src/seyond_nebula_bag_decoder.cpp
   src/nebula_decoder.cpp
   src/timescale.cpp
 )
 
-target_include_directories(seyond_nebula_bag_decoder PRIVATE
+set_target_properties(bag_converter_bin PROPERTIES OUTPUT_NAME bag_converter)
+
+target_include_directories(bag_converter_bin PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${SEYOND_SDK_PATH}/src
   ${PCL_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${nebula_decoders_INCLUDE_DIRS}
   ${nebula_common_INCLUDE_DIRS}
 )
 
-target_link_libraries(seyond_nebula_bag_decoder
+target_link_libraries(bag_converter_bin
+  ${SEYOND_SDK_PATH}/lib/libinnolidarsdkclient.a
+  ${SEYOND_SDK_PATH}/lib/libinnolidarsdkcommon.a
+  ${SEYOND_SDK_PATH}/lib/libinnolidarutils.a
   ${PCL_LIBRARIES}
 )
 
-ament_target_dependencies(seyond_nebula_bag_decoder
+ament_target_dependencies(bag_converter_bin
   rclcpp
   sensor_msgs
   nebula_msgs
@@ -92,7 +99,10 @@ ament_target_dependencies(seyond_nebula_bag_decoder
   nebula_common
 )
 
-install(TARGETS seyond_nebula_bag_decoder
+# Link with message generation
+target_link_libraries(bag_converter_bin "${cpp_typesupport_target}")
+
+install(TARGETS bag_converter_bin
   DESTINATION lib/${PROJECT_NAME}
 )
 

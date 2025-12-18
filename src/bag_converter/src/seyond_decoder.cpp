@@ -11,9 +11,10 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <pcl_conversions/pcl_conversions.h>
-#include <sdk_common/inno_lidar_api.h>
-#include <sdk_common/inno_lidar_packet.h>
-#include <sdk_common/inno_lidar_packet_utils.h>
+
+#include "sdk_common/inno_lidar_api.h"
+#include "sdk_common/inno_lidar_packet.h"
+#include "sdk_common/inno_lidar_packet_utils.h"
 
 #include <cstring>
 #include <type_traits>
@@ -34,7 +35,7 @@ SeyondPCDDecoder<OutputPointT>::~SeyondPCDDecoder() = default;
 
 template <typename OutputPointT>
 sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode(
-  const seyond_decoder::msg::SeyondScan & input)
+  const bag_converter::msg::SeyondScan & input)
 {
   // Create point cloud for processing
   pcl::PointCloud<OutputPointT> cloud;
@@ -46,7 +47,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode(
   if (!anglehv_table_init_) {
     // Look for HV table packet in the scan
     for (const auto & packet : input.packets) {
-      if (packet.type == seyond_decoder::msg::SeyondPacket::PACKET_TYPE_HVTABLE) {
+      if (packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_HVTABLE) {
         anglehv_table_.resize(packet.data.size());
         std::memcpy(anglehv_table_.data(), packet.data.data(), packet.data.size());
         anglehv_table_init_ = true;
@@ -60,7 +61,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode(
 
   // Process each packet in the scan
   for (const auto & packet : input.packets) {
-    if (packet.type == seyond_decoder::msg::SeyondPacket::PACKET_TYPE_POINTS) {
+    if (packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS) {
       process_packet(packet, cloud);
     }
   }
@@ -85,7 +86,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode(
 
 template <typename OutputPointT>
 void SeyondPCDDecoder<OutputPointT>::process_packet(
-  const seyond_decoder::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud)
+  const bag_converter::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud)
 {
   if (packet.data.empty()) {
     return;
