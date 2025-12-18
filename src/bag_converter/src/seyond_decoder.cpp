@@ -18,25 +18,29 @@
 #include <cstring>
 #include <type_traits>
 
-namespace bag_converter::decoder
+namespace bag_converter::decoder::seyond
 {
 
 // SeyondPCDDecoder implementation
-SeyondPCDDecoder::SeyondPCDDecoder(const SeyondPCDDecoderConfig & config)
+template <typename OutputPointT>
+SeyondPCDDecoder<OutputPointT>::SeyondPCDDecoder(const SeyondPCDDecoderConfig & config)
 : config_(config), anglehv_table_init_(false), current_ts_start_(0.0)
 {
-  data_buffer_.resize(2 * 1024 * 1024);  // 2MB buffer
+  data_buffer_.resize(defaults::data_buffer_size_bytes);
 }
 
-SeyondPCDDecoder::~SeyondPCDDecoder() = default;
+template <typename OutputPointT>
+SeyondPCDDecoder<OutputPointT>::~SeyondPCDDecoder() = default;
 
-sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder::decode(
+template <typename OutputPointT>
+sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode(
   const seyond_decoder::msg::SeyondScan & input)
 {
-  pcl::PointCloud<bag_converter::point::PointXYZIT> cloud;
+  // Create point cloud for processing
+  pcl::PointCloud<OutputPointT> cloud;
   cloud.header.frame_id = input.header.frame_id.empty() ? config_.frame_id : input.header.frame_id;
   cloud.header.stamp = input.header.stamp.sec * 1000000ULL + input.header.stamp.nanosec / 1000;
-  cloud.points.reserve(100000);  // Reserve space for points
+  cloud.points.reserve(defaults::initial_points_capacity);
 
   // Initialize angle HV table if not already initialized
   if (!anglehv_table_init_) {
@@ -46,6 +50,9 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder::decode(
         anglehv_table_.resize(packet.data.size());
         std::memcpy(anglehv_table_.data(), packet.data.data(), packet.data.size());
         anglehv_table_init_ = true;
+        RCLCPP_INFO(
+          rclcpp::get_logger("bag_converter.decoder.seyond"),
+          "Angle HV table initialized (size: %zu bytes)", packet.data.size());
         break;
       }
     }
@@ -58,31 +65,43 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder::decode(
     }
   }
 
-  // Convert to ROS message
-  auto msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
-  pcl::toROSMsg(cloud, *msg);
-  msg->header.stamp = input.header.stamp;
-  msg->header.frame_id = cloud.header.frame_id;
+  // Check if point cloud is empty
+  if (cloud.points.empty()) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("bag_converter.decoder.seyond"),
+      "Decoded point cloud is empty (no points found in scan)");
+  }
 
-  return msg;
+  // Create PointCloud2 message
+  auto pc2_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
+  pcl::toROSMsg(cloud, *pc2_msg);
+
+  // Set header timestamp from input message
+  pc2_msg->header.stamp = input.header.stamp;
+  pc2_msg->header.frame_id = cloud.header.frame_id;
+
+  return pc2_msg;
 }
 
-void SeyondPCDDecoder::process_packet(
-  const seyond_decoder::msg::SeyondPacket & packet, pcl::PointCloud<PointXYZIT> & cloud)
+template <typename OutputPointT>
+void SeyondPCDDecoder<OutputPointT>::process_packet(
+  const seyond_decoder::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud)
 {
   if (packet.data.empty()) {
     return;
   }
 
-  const InnoDataPacket * pkt = reinterpret_cast<const InnoDataPacket *>(packet.data.data());
+  // Convert packet data to InnoDataPacket structure
+  const auto * pkt = reinterpret_cast<const InnoDataPacket *>(packet.data.data());
   convert_and_parse(pkt, cloud);
 }
 
-void SeyondPCDDecoder::convert_and_parse(
-  const InnoDataPacket * pkt, pcl::PointCloud<PointXYZIT> & cloud)
+template <typename OutputPointT>
+void SeyondPCDDecoder<OutputPointT>::convert_and_parse(
+  const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud)
 {
   if (CHECK_SPHERE_POINTCLOUD_DATA(pkt->type)) {
-    // Convert sphere to xyz
+    // Convert sphere coordinate to xyz coordinate
     if (anglehv_table_init_) {
       inno_lidar_convert_to_xyz_pointcloud2(
         pkt, reinterpret_cast<InnoDataPacket *>(&data_buffer_[0]), data_buffer_.size(), false,
@@ -93,43 +112,53 @@ void SeyondPCDDecoder::convert_and_parse(
     }
     data_packet_parse(reinterpret_cast<InnoDataPacket *>(&data_buffer_[0]), cloud);
   } else if (CHECK_XYZ_POINTCLOUD_DATA(pkt->type)) {
+    // Directly parse xyz point cloud data
     data_packet_parse(pkt, cloud);
   } else {
     RCLCPP_ERROR(
-      rclcpp::get_logger("bag_converter.decoder"), "Packet type %d is not supported", pkt->type);
+      rclcpp::get_logger("bag_converter.decoder.seyond"), "Packet type %d is not supported",
+      pkt->type);
   }
 }
 
-void SeyondPCDDecoder::data_packet_parse(
-  const InnoDataPacket * pkt, pcl::PointCloud<PointXYZIT> & cloud)
+template <typename OutputPointT>
+void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
+  const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud)
 {
-  // Calculate the point timestamp
+  // Calculate the scan start timestamp
   current_ts_start_ = pkt->common.ts_start_us / us_in_second_c;
 
-  // Adapt different data structures from different lidars
+  // Parse point data based on packet type (different lidars use different structures)
   if (CHECK_EN_XYZ_POINTCLOUD_DATA(pkt->type)) {
     const InnoEnXyzPoint * pt = reinterpret_cast<const InnoEnXyzPoint *>(
       reinterpret_cast<const char *>(pkt) + sizeof(InnoDataPacket));
     point_xyz_data_parse<const InnoEnXyzPoint *>(
       config_.use_reflectance && pkt->use_reflectance, pkt->item_number, pt, cloud);
-  } else {
+  } else if (CHECK_XYZ_POINTCLOUD_DATA(pkt->type)) {
     const InnoXyzPoint * pt = reinterpret_cast<const InnoXyzPoint *>(
       reinterpret_cast<const char *>(pkt) + sizeof(InnoDataPacket));
     point_xyz_data_parse<const InnoXyzPoint *>(
       config_.use_reflectance && pkt->use_reflectance, pkt->item_number, pt, cloud);
+  } else {
+    RCLCPP_ERROR(
+      rclcpp::get_logger("bag_converter.decoder.seyond"), "Packet type %d is not supported",
+      pkt->type);
+    return;
   }
 }
 
+template <typename OutputPointT>
 template <typename PointType>
-void SeyondPCDDecoder::point_xyz_data_parse(
-  bool is_use_refl, uint32_t point_num, PointType point_ptr, pcl::PointCloud<PointXYZIT> & cloud)
+void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
+  bool is_use_refl, uint32_t point_num, PointType point_ptr, pcl::PointCloud<OutputPointT> & cloud)
 {
-  for (uint32_t i = 0; i < point_num; ++i, ++point_ptr) {
+  for (size_t i = 0; i < point_num; ++i, ++point_ptr) {
+    // Filter points by range
     if (point_ptr->radius > config_.max_range || point_ptr->radius < config_.min_range) {
       continue;
     }
 
-    bag_converter::point::PointXYZIT point;
+    OutputPointT point;
 
     // Set intensity based on point type and configuration
     if constexpr (std::is_same<PointType, const InnoEnXyzPoint *>::value) {
@@ -142,21 +171,26 @@ void SeyondPCDDecoder::point_xyz_data_parse(
     // Set timestamp (convert to microseconds from scan start)
     // point_ptr->ts_10us is in 10 microsecond units
     // Convert to microseconds: ts_10us * 10 = microseconds
-    point.t_us = point_ptr->ts_10us * 10;
+    if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT>) {
+      point.t_us = point_ptr->ts_10us * 10;
+    }
 
-    // Coordinate transformation
+    // Apply coordinate transformation
     coordinate_transfer(&point, config_.coordinate_mode, point_ptr->x, point_ptr->y, point_ptr->z);
 
     cloud.points.push_back(point);
   }
 
+  // Set point cloud dimensions: unorganized (1D) point cloud
+  // height = 1 means the point cloud is treated as a 1D array of points
   cloud.width = cloud.points.size();
   cloud.height = 1;
   cloud.is_dense = false;
 }
 
-void SeyondPCDDecoder::coordinate_transfer(
-  bag_converter::point::PointXYZIT * point, int mode, float x, float y, float z)
+template <typename OutputPointT>
+void SeyondPCDDecoder<OutputPointT>::coordinate_transfer(
+  OutputPointT * point, int mode, float x, float y, float z)
 {
   switch (mode) {
     case 0:
@@ -193,32 +227,48 @@ void SeyondPCDDecoder::coordinate_transfer(
   }
 }
 
-SeyondPCDDecoderConfig SeyondPCDDecoder::get_config() const
+template <typename OutputPointT>
+SeyondPCDDecoderConfig SeyondPCDDecoder<OutputPointT>::get_config() const
 {
   return config_;
 }
 
-void SeyondPCDDecoder::set_config(const SeyondPCDDecoderConfig & config)
+template <typename OutputPointT>
+void SeyondPCDDecoder<OutputPointT>::set_config(const SeyondPCDDecoderConfig & config)
 {
   config_ = config;
 }
 
-void SeyondPCDDecoder::set_angle_hv_table(const std::vector<char> & table)
+template <typename OutputPointT>
+void SeyondPCDDecoder<OutputPointT>::set_angle_hv_table(const std::vector<char> & table)
 {
   anglehv_table_ = table;
   anglehv_table_init_ = true;
 }
 
-void SeyondPCDDecoder::clear_angle_hv_table()
+template <typename OutputPointT>
+void SeyondPCDDecoder<OutputPointT>::clear_angle_hv_table()
 {
   anglehv_table_.clear();
   anglehv_table_init_ = false;
 }
 
 // Explicit template instantiations
-template void SeyondPCDDecoder::point_xyz_data_parse<const InnoEnXyzPoint *>(
-  bool, uint32_t, const InnoEnXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIT> &);
-template void SeyondPCDDecoder::point_xyz_data_parse<const InnoXyzPoint *>(
-  bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIT> &);
+template class SeyondPCDDecoder<bag_converter::point::PointXYZIT>;
+template class SeyondPCDDecoder<bag_converter::point::PointXYZI>;
 
-}  // namespace bag_converter::decoder
+// Explicit template instantiations for point_xyz_data_parse
+template void
+SeyondPCDDecoder<bag_converter::point::PointXYZIT>::point_xyz_data_parse<const InnoEnXyzPoint *>(
+  bool, uint32_t, const InnoEnXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIT> &);
+template void
+SeyondPCDDecoder<bag_converter::point::PointXYZIT>::point_xyz_data_parse<const InnoXyzPoint *>(
+  bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIT> &);
+template void
+SeyondPCDDecoder<bag_converter::point::PointXYZI>::point_xyz_data_parse<const InnoEnXyzPoint *>(
+  bool, uint32_t, const InnoEnXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZI> &);
+template void
+SeyondPCDDecoder<bag_converter::point::PointXYZI>::point_xyz_data_parse<const InnoXyzPoint *>(
+  bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZI> &);
+
+}  // namespace bag_converter::decoder::seyond

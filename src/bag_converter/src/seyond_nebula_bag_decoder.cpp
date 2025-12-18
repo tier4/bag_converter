@@ -134,7 +134,8 @@ public:
 
     // Discover all nebula_packets topics to convert
     std::map<std::string, std::string> topic_mapping;  // input_topic -> output_topic
-    std::map<std::string, std::unique_ptr<bag_converter::decoder::NebulaPCDDecoder<>>> decoders;
+    std::map<std::string, std::unique_ptr<bag_converter::decoder::nebula::NebulaPCDDecoder<>>>
+      decoders;
 
     std::cout << "Scanning for nebula packet topics..." << std::endl;
 
@@ -154,7 +155,7 @@ public:
         topic_mapping[topic_metadata.name] = converted_topic;
 
         // Create decoder for this topic with appropriate frame_id
-        bag_converter::decoder::NebulaPCDDecoderConfig decoder_config;
+        bag_converter::decoder::nebula::NebulaPCDDecoderConfig decoder_config;
         decoder_config.sensor_model = config_.sensor_model;
         decoder_config.return_mode = config_.return_mode;
         decoder_config.min_range = config_.min_range;
@@ -178,7 +179,7 @@ public:
         }
 
         decoders[topic_metadata.name] =
-          std::make_unique<bag_converter::decoder::NebulaPCDDecoder<>>(decoder_config);
+          std::make_unique<bag_converter::decoder::nebula::NebulaPCDDecoder<>>(decoder_config);
 
         std::cout << "Found a decodable topic: " << topic_metadata.name
                   << " (sensor_model: " << decoder_config.sensor_model

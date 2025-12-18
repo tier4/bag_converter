@@ -17,12 +17,15 @@
 #include <nebula_common/seyond/seyond_common.hpp>
 
 // Forward declarations to avoid include issues
-namespace nebula::drivers
+namespace nebula
+{
+namespace drivers
 {
 class SeyondDriver;
 class SeyondSensorConfiguration;
 class SeyondCalibrationConfiguration;
-}  // namespace nebula::drivers
+}  // namespace drivers
+}  // namespace nebula
 
 #include <nebula_msgs/msg/nebula_packets.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -37,7 +40,7 @@ class SeyondCalibrationConfiguration;
 #include <tuple>
 #include <vector>
 
-namespace bag_converter::decoder
+namespace bag_converter::decoder::nebula
 {
 
 // Default configuration constants
@@ -119,7 +122,7 @@ public:
    * @param packet Raw packet bytes
    * @return Tuple of (complete_cloud, scan_complete_flag)
    */
-  std::tuple<nebula::drivers::NebulaPointCloudPtr, bool> process_packet(
+  std::tuple<::nebula::drivers::NebulaPointCloudPtr, bool> process_packet(
     const std::vector<uint8_t> & packet);
 
   /**
@@ -127,7 +130,7 @@ public:
    * @param packets Vector of packet data
    * @return Complete point cloud if available
    */
-  nebula::drivers::NebulaPointCloudPtr process_packets(
+  ::nebula::drivers::NebulaPointCloudPtr process_packets(
     const std::vector<std::vector<uint8_t>> & packets);
 
   /**
@@ -135,14 +138,14 @@ public:
    * @param packets Nebula packets container
    * @return Nebula format point cloud
    */
-  nebula::drivers::NebulaPointCloudPtr process_nebula_packets(
+  ::nebula::drivers::NebulaPointCloudPtr process_nebula_packets(
     const nebula_msgs::msg::NebulaPackets & packets);
 
   /**
    * @brief Flush any remaining points in the decoder
    * @return Point cloud if available
    */
-  nebula::drivers::NebulaPointCloudPtr flush_cloud_points();
+  ::nebula::drivers::NebulaPointCloudPtr flush_cloud_points();
 
   /**
    * @brief Get configuration
@@ -161,11 +164,11 @@ private:
   NebulaPCDDecoderConfig config_;
 
   // Nebula driver components (like seyond_rosbag_to_pcd)
-  std::shared_ptr<nebula::drivers::SeyondDriver> driver_;
-  std::shared_ptr<nebula::drivers::SeyondSensorConfiguration> sensor_config_;
-  std::shared_ptr<nebula::drivers::SeyondCalibrationConfiguration> calibration_config_;
+  std::shared_ptr<::nebula::drivers::SeyondDriver> driver_;
+  std::shared_ptr<::nebula::drivers::SeyondSensorConfiguration> sensor_config_;
+  std::shared_ptr<::nebula::drivers::SeyondCalibrationConfiguration> calibration_config_;
 };
 
-}  // namespace bag_converter::decoder
+}  // namespace bag_converter::decoder::nebula
 
 #endif  // BAG_CONVERTER__NEBULA_DECODER_HPP

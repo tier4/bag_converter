@@ -18,7 +18,7 @@
 #include <iostream>
 #include <type_traits>
 
-namespace bag_converter::decoder
+namespace bag_converter::decoder::nebula
 {
 
 // NebulaPCDDecoder implementation
@@ -27,7 +27,7 @@ NebulaPCDDecoder<OutputPointT>::NebulaPCDDecoder(const NebulaPCDDecoderConfig & 
 : config_(config)
 {
   // Create sensor configuration
-  sensor_config_ = std::make_shared<nebula::drivers::SeyondSensorConfiguration>();
+  sensor_config_ = std::make_shared<::nebula::drivers::SeyondSensorConfiguration>();
 
   // Set basic network config (these won't be used for offline processing)
   sensor_config_->host_ip = defaults::dummy_host_ip;
@@ -37,8 +37,8 @@ NebulaPCDDecoder<OutputPointT>::NebulaPCDDecoder(const NebulaPCDDecoderConfig & 
   sensor_config_->packet_mtu_size = defaults::dummy_packet_mtu_size;
 
   // Set sensor model and return mode
-  sensor_config_->sensor_model = nebula::drivers::SensorModelFromString(config.sensor_model);
-  sensor_config_->return_mode = nebula::drivers::ReturnModeFromString(config.return_mode);
+  sensor_config_->sensor_model = ::nebula::drivers::SensorModelFromString(config.sensor_model);
+  sensor_config_->return_mode = ::nebula::drivers::ReturnModeFromString(config.return_mode);
 
   // Set other parameters
   sensor_config_->frame_id = config.frame_id;
@@ -51,15 +51,16 @@ NebulaPCDDecoder<OutputPointT>::NebulaPCDDecoder(const NebulaPCDDecoderConfig & 
   sensor_config_->max_range = config.max_range;
 
   // Create calibration configuration
-  calibration_config_ = std::make_shared<nebula::drivers::SeyondCalibrationConfiguration>();
+  calibration_config_ = std::make_shared<::nebula::drivers::SeyondCalibrationConfiguration>();
 
   // Initialize the driver
   try {
-    driver_ = std::make_shared<nebula::drivers::SeyondDriver>(sensor_config_, calibration_config_);
+    driver_ =
+      std::make_shared<::nebula::drivers::SeyondDriver>(sensor_config_, calibration_config_);
 
     // Check actual driver status
     auto driver_status = driver_->GetStatus();  // Note: driver_->GetStatus() is from nebula library
-    if (driver_status != nebula::Status::OK) {
+    if (driver_status != ::nebula::Status::OK) {
       throw std::runtime_error("Failed to initialize driver: driver status is not OK");
     }
   } catch (const std::exception & e) {
@@ -118,7 +119,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode(
 }
 
 template <typename OutputPointT>
-std::tuple<nebula::drivers::NebulaPointCloudPtr, bool>
+std::tuple<::nebula::drivers::NebulaPointCloudPtr, bool>
 NebulaPCDDecoder<OutputPointT>::process_packet(const std::vector<uint8_t> & packet)
 {
   // Process the packet - the driver returns a cloud when scan is complete
@@ -133,10 +134,10 @@ NebulaPCDDecoder<OutputPointT>::process_packet(const std::vector<uint8_t> & pack
 }
 
 template <typename OutputPointT>
-nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_packets(
+::nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_packets(
   const std::vector<std::vector<uint8_t>> & packets)
 {
-  nebula::drivers::NebulaPointCloudPtr complete_cloud;
+  ::nebula::drivers::NebulaPointCloudPtr complete_cloud;
   double scan_timestamp_s = 0;
   bool once = false;
 
@@ -164,7 +165,7 @@ nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_pac
 }
 
 template <typename OutputPointT>
-nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_nebula_packets(
+::nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_nebula_packets(
   const nebula_msgs::msg::NebulaPackets & packets)
 {
   std::vector<std::vector<uint8_t>> packet_data_vec;
@@ -178,7 +179,7 @@ nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_neb
 }
 
 template <typename OutputPointT>
-nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::flush_cloud_points()
+::nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::flush_cloud_points()
 {
   auto [cloud, cloud_timestamp] = driver_->FlushCloudPoints();
 
@@ -202,8 +203,8 @@ void NebulaPCDDecoder<OutputPointT>::set_config(const NebulaPCDDecoderConfig & c
   config_ = config;
 
   // Update sensor configuration
-  sensor_config_->sensor_model = nebula::drivers::SensorModelFromString(config.sensor_model);
-  sensor_config_->return_mode = nebula::drivers::ReturnModeFromString(config.return_mode);
+  sensor_config_->sensor_model = ::nebula::drivers::SensorModelFromString(config.sensor_model);
+  sensor_config_->return_mode = ::nebula::drivers::ReturnModeFromString(config.return_mode);
   sensor_config_->frame_id = config.frame_id;
   sensor_config_->scan_phase = config.scan_phase;
   sensor_config_->frequency_ms = static_cast<uint16_t>(config.frequency_ms);
@@ -216,4 +217,4 @@ void NebulaPCDDecoder<OutputPointT>::set_config(const NebulaPCDDecoderConfig & c
 template class NebulaPCDDecoder<bag_converter::point::PointXYZIT>;
 template class NebulaPCDDecoder<bag_converter::point::PointXYZI>;
 
-}  // namespace bag_converter::decoder
+}  // namespace bag_converter::decoder::nebula

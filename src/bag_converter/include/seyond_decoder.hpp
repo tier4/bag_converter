@@ -31,27 +31,30 @@ struct InnoEnXyzPoint;
 #include <string>
 #include <vector>
 
-namespace bag_converter::decoder
+namespace bag_converter::decoder::seyond
 {
 
 // Default configuration constants
-namespace seyond_defaults
+namespace defaults
 {
 inline constexpr double min_range = 0.3;
 inline constexpr double max_range = 200.0;
 inline constexpr int coordinate_mode = 3;
 inline constexpr bool use_reflectance = true;
 inline constexpr const char * frame_id = "lidar";
-}  // namespace seyond_defaults
+inline constexpr size_t data_buffer_size_bytes = 2 * 1024 * 1024;  // 2MB buffer
+inline constexpr size_t initial_points_capacity =
+  100000;  // Initial capacity for point cloud reservation
+}  // namespace defaults
 
 // Configuration for the decoder
 struct SeyondPCDDecoderConfig
 {
-  double min_range = seyond_defaults::min_range;
-  double max_range = seyond_defaults::max_range;
-  int coordinate_mode = seyond_defaults::coordinate_mode;
-  bool use_reflectance = seyond_defaults::use_reflectance;
-  std::string frame_id = seyond_defaults::frame_id;
+  double min_range = defaults::min_range;
+  double max_range = defaults::max_range;
+  int coordinate_mode = defaults::coordinate_mode;
+  bool use_reflectance = defaults::use_reflectance;
+  std::string frame_id = defaults::frame_id;
 };
 
 /**
@@ -59,8 +62,12 @@ struct SeyondPCDDecoderConfig
  *
  * This class provides the decode interface required by PCDDecoder and uses
  * the Seyond decoder logic for packet processing.
+ *
+ * @tparam OutputPointT The point type used for output point cloud (default:
+ * bag_converter::point::PointXYZIT)
  */
-class SeyondPCDDecoder : public PCDDecoder<seyond_decoder::msg::SeyondScan>
+template <typename OutputPointT = bag_converter::point::PointXYZIT>
+class SeyondPCDDecoder : public PCDDecoder<seyond_decoder::msg::SeyondScan, OutputPointT>
 {
 public:
   /**
@@ -73,6 +80,12 @@ public:
    * @brief Destructor
    */
   ~SeyondPCDDecoder() override;
+
+  // Disable copy and move operations (inherited from base class)
+  SeyondPCDDecoder(const SeyondPCDDecoder &) = delete;
+  SeyondPCDDecoder & operator=(const SeyondPCDDecoder &) = delete;
+  SeyondPCDDecoder(SeyondPCDDecoder &&) = delete;
+  SeyondPCDDecoder & operator=(SeyondPCDDecoder &&) = delete;
 
   /**
    * @brief Decode SeyondScan message to PointCloud2 (required by PCDDecoder)
@@ -113,22 +126,18 @@ public:
 
 private:
   void process_packet(
-    const seyond_decoder::msg::SeyondPacket & packet,
-    pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
+    const seyond_decoder::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud);
 
-  void convert_and_parse(
-    const InnoDataPacket * pkt, pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
+  void convert_and_parse(const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud);
 
-  void data_packet_parse(
-    const InnoDataPacket * pkt, pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
+  void data_packet_parse(const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud);
 
   template <typename PointType>
   void point_xyz_data_parse(
     bool is_use_refl, uint32_t point_num, PointType point_ptr,
-    pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
+    pcl::PointCloud<OutputPointT> & cloud);
 
-  void coordinate_transfer(
-    bag_converter::point::PointXYZIT * point, int mode, float x, float y, float z);
+  void coordinate_transfer(OutputPointT * point, int mode, float x, float y, float z);
 
 private:
   SeyondPCDDecoderConfig config_;
@@ -141,6 +150,6 @@ private:
   static constexpr double ten_us_in_second_c = 100000.0;
 };
 
-}  // namespace bag_converter::decoder
+}  // namespace bag_converter::decoder::seyond
 
 #endif  // BAG_CONVERTER__SEYOND_DECODER_HPP

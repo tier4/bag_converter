@@ -36,6 +36,7 @@ find_package(builtin_interfaces REQUIRED)
 # Build seyond_bag_decoder executable
 add_executable(seyond_bag_decoder
   src/seyond_bag_decoder.cpp
+  src/seyond_decoder.cpp
 )
 
 target_include_directories(seyond_bag_decoder PRIVATE
