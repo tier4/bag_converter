@@ -176,8 +176,8 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       point.t_us = point_ptr->ts_10us * 10;
     }
 
-    // Apply coordinate transformation
-    coordinate_transfer(&point, config_.coordinate_mode, point_ptr->x, point_ptr->y, point_ptr->z);
+    // Apply coordinate transformation (Autoware coordinate system)
+    coordinate_transfer(&point, point_ptr->x, point_ptr->y, point_ptr->z);
 
     cloud.points.push_back(point);
   }
@@ -191,41 +191,13 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
 
 template <typename OutputPointT>
 void SeyondPCDDecoder<OutputPointT>::coordinate_transfer(
-  OutputPointT * point, int mode, float x, float y, float z)
+  OutputPointT * point, float x, float y, float z)
 {
-  switch (mode) {
-    case 0:
-      point->x = x;  // up
-      point->y = y;  // right
-      point->z = z;  // forward
-      break;
-    case 1:
-      point->x = y;  // right
-      point->y = z;  // forward
-      point->z = x;  // up
-      break;
-    case 2:
-      point->x = y;  // right
-      point->y = x;  // up
-      point->z = z;  // forward
-      break;
-    case 3:
-      point->x = z;   // forward
-      point->y = -y;  // -right
-      point->z = x;   // up
-      break;
-    case 4:
-      point->x = z;  // forward
-      point->y = x;  // up
-      point->z = y;  // right
-      break;
-    default:
-      // default
-      point->x = x;  // up
-      point->y = y;  // right
-      point->z = z;  // forward
-      break;
-  }
+  // Convert from Seyond coordinate system (x=up, y=right, z=forward)
+  // to Autoware coordinate system (x=forward, y=left, z=up)
+  point->x = z;   // forward
+  point->y = -y;  // left (negative right)
+  point->z = x;   // up
 }
 
 template <typename OutputPointT>

@@ -47,7 +47,6 @@ inline constexpr double max_range = 200.0;
 inline constexpr bool keep_original_topics = false;
 
 // Seyond-specific defaults
-inline constexpr int coordinate_mode = 3;
 inline constexpr bool use_reflectance = false;
 
 // Output point type default
@@ -69,7 +68,6 @@ struct Config
   bool keep_original_topics = defaults::keep_original_topics;
 
   // Seyond-specific configuration
-  int coordinate_mode = defaults::coordinate_mode;
   bool use_reflectance = defaults::use_reflectance;
 
   // Output point type: "xyzit" or "xyzi"

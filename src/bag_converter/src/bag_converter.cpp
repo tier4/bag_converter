@@ -83,10 +83,9 @@ void print_usage(const char * program_name)
     << "\nOutput format:\n"
     << "  - sensor_msgs/msg/PointCloud2 with PointXYZIT fields\n"
     << "\nOptions:\n"
-    << "  --keep-original    Keep original packet topics in output bag\n"
+    << "  --keep-original           Keep original packet topics in output bag\n"
     << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
     << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
-    << "  --coordinate-mode <n>     Coordinate mode for Seyond 0-4 (default: 3)\n"
     << "  --point-type <type>       Output point type: xyzit or xyzi (default: xyzit)\n"
     << "  -h, --help                Show this help message\n";
 }
@@ -117,8 +116,6 @@ bool parse_arguments(int argc, char ** argv, Config & config)
       config.min_range = std::stod(argv[++i]);
     } else if (arg == "--max-range" && i + 1 < argc) {
       config.max_range = std::stod(argv[++i]);
-    } else if (arg == "--coordinate-mode" && i + 1 < argc) {
-      config.coordinate_mode = std::stoi(argv[++i]);
     } else if (arg == "--point-type" && i + 1 < argc) {
       config.point_type = argv[++i];
       if (config.point_type != "xyzit" && config.point_type != "xyzi") {
@@ -171,7 +168,6 @@ std::unique_ptr<decoder::BasePCDDecoder> create_seyond_decoder(
   decoder::seyond::SeyondPCDDecoderConfig decoder_config;
   decoder_config.min_range = config.min_range;
   decoder_config.max_range = config.max_range;
-  decoder_config.coordinate_mode = config.coordinate_mode;
   decoder_config.use_reflectance = config.use_reflectance;
 
   auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
@@ -353,7 +349,6 @@ int run(const Config & config)
   RCLCPP_INFO(logger, "Configuration:");
   RCLCPP_INFO(logger, "  Min range: %.1f m", config.min_range);
   RCLCPP_INFO(logger, "  Max range: %.1f m", config.max_range);
-  RCLCPP_INFO(logger, "  Seyond coordinate mode: %d", config.coordinate_mode);
   RCLCPP_INFO(logger, "  Point type: %s", config.point_type.c_str());
   RCLCPP_INFO(logger, "  Keep original topics: %s", config.keep_original_topics ? "yes" : "no");
 

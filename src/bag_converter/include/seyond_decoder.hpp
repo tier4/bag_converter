@@ -39,7 +39,6 @@ namespace defaults
 {
 inline constexpr double min_range = 0.3;
 inline constexpr double max_range = 200.0;
-inline constexpr int coordinate_mode = 3;
 inline constexpr bool use_reflectance = true;
 inline constexpr const char * frame_id = "lidar";
 inline constexpr size_t data_buffer_size_bytes = 2 * 1024 * 1024;  // 2MB buffer
@@ -52,7 +51,6 @@ struct SeyondPCDDecoderConfig
 {
   double min_range = defaults::min_range;
   double max_range = defaults::max_range;
-  int coordinate_mode = defaults::coordinate_mode;
   bool use_reflectance = defaults::use_reflectance;
   std::string frame_id = defaults::frame_id;
 };
@@ -137,7 +135,7 @@ private:
     bool is_use_refl, uint32_t point_num, PointType point_ptr,
     pcl::PointCloud<OutputPointT> & cloud);
 
-  void coordinate_transfer(OutputPointT * point, int mode, float x, float y, float z);
+  void coordinate_transfer(OutputPointT * point, float x, float y, float z);
 
 private:
   SeyondPCDDecoderConfig config_;
