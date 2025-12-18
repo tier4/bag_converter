@@ -83,7 +83,7 @@ void print_usage(const char * program_name)
     << "\nOutput format:\n"
     << "  - sensor_msgs/msg/PointCloud2 with PointXYZIT fields\n"
     << "\nOptions:\n"
-    << "  --keep-original-topics    Keep original packet topics in output bag\n"
+    << "  --keep-original    Keep original packet topics in output bag\n"
     << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
     << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
     << "  --coordinate-mode <n>     Coordinate mode for Seyond 0-4 (default: 3)\n"
@@ -111,7 +111,7 @@ bool parse_arguments(int argc, char ** argv, Config & config)
 
   for (int i = 3; i < argc; i++) {
     std::string arg = argv[i];
-    if (arg == "--keep-original-topics") {
+    if (arg == "--keep-original") {
       config.keep_original_topics = true;
     } else if (arg == "--min-range" && i + 1 < argc) {
       config.min_range = std::stod(argv[++i]);
