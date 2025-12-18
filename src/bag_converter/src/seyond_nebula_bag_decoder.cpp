@@ -28,61 +28,8 @@
 #include <string>
 #include <vector>
 
-inline constexpr double k_utc_offset_to_tai_sec = 37;
-inline constexpr double k_utc_offset_to_gps_sec = 18;
-inline constexpr double k_gps_offset_to_tai_sec = 19;
-inline constexpr double k_timescale_correction_tolerance_sec = 0.35;
 inline constexpr size_t k_min_points_per_scan = 1000;
 
-std::uint64_t correct_timescale(
-  std::uint64_t ref_time_ns, std::uint64_t time_ns_to_correct,
-  const std::string & ref_timescale = "utc")
-{
-  const double ref_time_sec = static_cast<double>(ref_time_ns) / 1e9;
-  const double time_sec_to_correct = static_cast<double>(time_ns_to_correct) / 1e9;
-  const auto diff = ref_time_sec - time_sec_to_correct;
-  if (ref_timescale == "utc") {
-    // ref: UTC, to-correct: TAI
-    if (
-      diff > (-k_utc_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
-      diff < (-k_utc_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct - static_cast<std::uint64_t>(k_utc_offset_to_tai_sec * 1e9);
-    }
-    // ref: UTC, to-correct: GPS
-    if (
-      diff > (-k_utc_offset_to_gps_sec - k_timescale_correction_tolerance_sec) &&
-      diff < (-k_utc_offset_to_gps_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct - static_cast<std::uint64_t>(k_utc_offset_to_gps_sec * 1e9);
-    }
-  } else if (ref_timescale == "tai") {
-    // ref: TAI, to-correct: UTC
-    if (
-      diff > (k_utc_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
-      diff < (k_utc_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct + static_cast<std::uint64_t>(k_utc_offset_to_tai_sec * 1e9);
-    }
-    // ref: TAI, to-correct: GPS
-    if (
-      diff > (k_gps_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
-      diff < (k_gps_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct + static_cast<std::uint64_t>(k_gps_offset_to_tai_sec * 1e9);
-    }
-  } else if (ref_timescale == "gps") {
-    // ref: GPS, to-correct: UTC
-    if (
-      diff > (k_utc_offset_to_gps_sec - k_timescale_correction_tolerance_sec) &&
-      diff < (k_utc_offset_to_gps_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct + static_cast<std::uint64_t>(k_utc_offset_to_gps_sec * 1e9);
-    }
-    // ref: GPS, to-correct: TAI
-    if (
-      diff > (-k_gps_offset_to_tai_sec - k_timescale_correction_tolerance_sec) &&
-      diff < (-k_gps_offset_to_tai_sec + k_timescale_correction_tolerance_sec)) {
-      return time_ns_to_correct - static_cast<std::uint64_t>(k_gps_offset_to_tai_sec * 1e9);
-    }
-  }
-  return time_ns_to_correct;
-}
 namespace fs = std::filesystem;
 
 class SeyondNebulaBagDecoder
@@ -103,8 +50,6 @@ public:
     bool use_reflectance = true;
     std::string calibration_file;
     bool keep_original_topics = false;
-    bool enable_timescale_correction = true;
-    std::string system_timescale = "utc";
   };
 
   explicit SeyondNebulaBagDecoder(Config config) : config_(std::move(config)) {}
@@ -279,14 +224,6 @@ public:
       const auto & output_topic = it->second;
       const rclcpp::Time receive_timestamp(bag_msg->time_stamp);
 
-      // Apply timescale correction
-      if (config_.enable_timescale_correction) {
-        const uint64_t sensor_time_ns = nebula_cloud->header.stamp * 1000;
-        const auto sensor_time_ns_corrected = correct_timescale(
-          receive_timestamp.nanoseconds(), sensor_time_ns, config_.system_timescale);
-        nebula_cloud->header.stamp = sensor_time_ns_corrected / 1000;
-      }
-
       // Convert to PointXYZIT for PCL conversion
       pcl::PointCloud<bag_converter::point::PointXYZIT> pc2_cloud;
       pc2_cloud.header = nebula_cloud->header;
@@ -340,16 +277,8 @@ void print_usage(const char * program_name)
     << "Usage: " << program_name << " <input_bag> <output_bag> [options]\n"
     << "\nThis tool automatically detects and converts all nebula packet topics.\n"
     << "Topics containing '/nebula_packets' will be converted to '/nebula_points'.\n"
-    << "\nTimescale Correction:\n"
-    << "  Timescale correction automatically detects time offset between system timestamp\n"
-    << "  and sensor timestamp. If a timescale difference occurs between system and sensor\n"
-    << "  timestamps, correction is applied. The --system-timescale option specifies the\n"
-    << "  timescale of the reference system timestamp.\n"
     << "\nOptions:\n"
-    << "  --keep-original-topics        Keep original /nebula_packets topics in output bag\n"
-    << "  --no-timescale-correction      Disable timescale correction (UTC/TAI/GPS conversion)\n"
-    << "  --system-timescale <scale>     Timescale of reference system timestamp for correction\n"
-    << "                                  (utc/tai/gps, default: utc)\n";
+    << "  --keep-original-topics        Keep original /nebula_packets topics in output bag\n";
 }
 
 int main(int argc, char ** argv)
@@ -378,20 +307,6 @@ int main(int argc, char ** argv)
     std::string arg = argv[i];
     if (arg == "--keep-original-topics") {
       config.keep_original_topics = true;
-    } else if (arg == "--no-timescale-correction") {
-      config.enable_timescale_correction = false;
-    } else if (arg == "--system-timescale") {
-      if (i + 1 >= argc) {
-        std::cerr << "Error: --system-timescale requires a value (utc/tai/gps)" << std::endl;
-        return 1;
-      }
-      config.system_timescale = argv[++i];
-      if (
-        config.system_timescale != "utc" && config.system_timescale != "tai" &&
-        config.system_timescale != "gps") {
-        std::cerr << "Error: --system-timescale must be one of: utc, tai, gps" << std::endl;
-        return 1;
-      }
     }
   }
 

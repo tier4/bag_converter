@@ -64,6 +64,7 @@ install(TARGETS seyond_bag_decoder
 add_executable(seyond_nebula_bag_decoder
   src/seyond_nebula_bag_decoder.cpp
   src/nebula_decoder.cpp
+  src/timescale.cpp
 )
 
 target_include_directories(seyond_nebula_bag_decoder PRIVATE
