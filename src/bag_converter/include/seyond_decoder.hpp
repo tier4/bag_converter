@@ -113,17 +113,22 @@ public:
 
 private:
   void process_packet(
-    const seyond_decoder::msg::SeyondPacket & packet, pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
+    const seyond_decoder::msg::SeyondPacket & packet,
+    pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
 
-  void convert_and_parse(const InnoDataPacket * pkt, pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
+  void convert_and_parse(
+    const InnoDataPacket * pkt, pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
 
-  void data_packet_parse(const InnoDataPacket * pkt, pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
+  void data_packet_parse(
+    const InnoDataPacket * pkt, pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
 
   template <typename PointType>
   void point_xyz_data_parse(
-    bool is_use_refl, uint32_t point_num, PointType point_ptr, pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
+    bool is_use_refl, uint32_t point_num, PointType point_ptr,
+    pcl::PointCloud<bag_converter::point::PointXYZIT> & cloud);
 
-  void coordinate_transfer(bag_converter::point::PointXYZIT * point, int mode, float x, float y, float z);
+  void coordinate_transfer(
+    bag_converter::point::PointXYZIT * point, int mode, float x, float y, float z);
 
 private:
   SeyondPCDDecoderConfig config_;
@@ -139,4 +144,3 @@ private:
 }  // namespace bag_converter::decoder
 
 #endif  // BAG_CONVERTER__SEYOND_DECODER_HPP
-

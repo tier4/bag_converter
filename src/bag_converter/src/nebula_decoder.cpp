@@ -16,12 +16,15 @@
 
 #include <iomanip>
 #include <iostream>
+#include <type_traits>
 
 namespace bag_converter::decoder
 {
 
 // NebulaPCDDecoder implementation
-NebulaPCDDecoder::NebulaPCDDecoder(const NebulaPCDDecoderConfig & config) : config_(config)
+template <typename OutputPointT>
+NebulaPCDDecoder<OutputPointT>::NebulaPCDDecoder(const NebulaPCDDecoderConfig & config)
+: config_(config)
 {
   // Create sensor configuration
   sensor_config_ = std::make_shared<nebula::drivers::SeyondSensorConfiguration>();
@@ -66,9 +69,11 @@ NebulaPCDDecoder::NebulaPCDDecoder(const NebulaPCDDecoderConfig & config) : conf
   }
 }
 
-NebulaPCDDecoder::~NebulaPCDDecoder() = default;
+template <typename OutputPointT>
+NebulaPCDDecoder<OutputPointT>::~NebulaPCDDecoder() = default;
 
-sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder::decode(
+template <typename OutputPointT>
+sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode(
   const nebula_msgs::msg::NebulaPackets & input)
 {
   // Process NebulaPackets
@@ -81,8 +86,8 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder::decode(
     return nullptr;
   }
 
-  // Convert NebulaPointCloud to PointXYZIT for PCL conversion
-  pcl::PointCloud<bag_converter::point::PointXYZIT> pc2_cloud;
+  // Convert NebulaPointCloud to OutputPointT for PCL conversion
+  pcl::PointCloud<OutputPointT> pc2_cloud;
   pc2_cloud.header = nebula_cloud->header;
   pc2_cloud.header.frame_id = config_.frame_id;
   pc2_cloud.width = nebula_cloud->width;
@@ -90,12 +95,14 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder::decode(
   pc2_cloud.is_dense = nebula_cloud->is_dense;
 
   for (const auto & pt : nebula_cloud->points) {
-    bag_converter::point::PointXYZIT pc2_pt;
+    OutputPointT pc2_pt;
     pc2_pt.x = pt.x;
     pc2_pt.y = pt.y;
     pc2_pt.z = pt.z;
     pc2_pt.intensity = pt.intensity;
-    pc2_pt.t_us = pt.time_stamp;
+    if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT>) {
+      pc2_pt.t_us = pt.time_stamp;
+    }
     pc2_cloud.push_back(pc2_pt);
   }
 
@@ -110,8 +117,9 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder::decode(
   return pc2_msg;
 }
 
-std::tuple<nebula::drivers::NebulaPointCloudPtr, bool> NebulaPCDDecoder::process_packet(
-  const std::vector<uint8_t> & packet)
+template <typename OutputPointT>
+std::tuple<nebula::drivers::NebulaPointCloudPtr, bool>
+NebulaPCDDecoder<OutputPointT>::process_packet(const std::vector<uint8_t> & packet)
 {
   // Process the packet - the driver returns a cloud when scan is complete
   auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet);
@@ -124,7 +132,8 @@ std::tuple<nebula::drivers::NebulaPointCloudPtr, bool> NebulaPCDDecoder::process
   return {nullptr, false};
 }
 
-nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder::process_packets(
+template <typename OutputPointT>
+nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_packets(
   const std::vector<std::vector<uint8_t>> & packets)
 {
   nebula::drivers::NebulaPointCloudPtr complete_cloud;
@@ -154,7 +163,8 @@ nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder::process_packets(
   return complete_cloud;
 }
 
-nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder::process_nebula_packets(
+template <typename OutputPointT>
+nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_nebula_packets(
   const nebula_msgs::msg::NebulaPackets & packets)
 {
   std::vector<std::vector<uint8_t>> packet_data_vec;
@@ -167,7 +177,8 @@ nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder::process_nebula_packets(
   return process_packets(packet_data_vec);
 }
 
-nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder::flush_cloud_points()
+template <typename OutputPointT>
+nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::flush_cloud_points()
 {
   auto [cloud, cloud_timestamp] = driver_->FlushCloudPoints();
 
@@ -179,12 +190,14 @@ nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder::flush_cloud_points()
   return nullptr;
 }
 
-NebulaPCDDecoderConfig NebulaPCDDecoder::get_config() const
+template <typename OutputPointT>
+NebulaPCDDecoderConfig NebulaPCDDecoder<OutputPointT>::get_config() const
 {
   return config_;
 }
 
-void NebulaPCDDecoder::set_config(const NebulaPCDDecoderConfig & config)
+template <typename OutputPointT>
+void NebulaPCDDecoder<OutputPointT>::set_config(const NebulaPCDDecoderConfig & config)
 {
   config_ = config;
 
@@ -198,5 +211,9 @@ void NebulaPCDDecoder::set_config(const NebulaPCDDecoderConfig & config)
   sensor_config_->min_range = config.min_range;
   sensor_config_->max_range = config.max_range;
 }
+
+// Explicit template instantiations
+template class NebulaPCDDecoder<bag_converter::point::PointXYZIT>;
+template class NebulaPCDDecoder<bag_converter::point::PointXYZI>;
 
 }  // namespace bag_converter::decoder

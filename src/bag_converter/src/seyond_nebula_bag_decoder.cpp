@@ -3,8 +3,8 @@
  * @brief Decode Seyond LiDAR nebula packets from rosbag and convert to point clouds
  */
 
-#include "point_types.hpp"
 #include "nebula_decoder.hpp"
+#include "point_types.hpp"
 
 #include <builtin_interfaces/msg/time.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -134,7 +134,7 @@ public:
 
     // Discover all nebula_packets topics to convert
     std::map<std::string, std::string> topic_mapping;  // input_topic -> output_topic
-    std::map<std::string, std::unique_ptr<bag_converter::decoder::NebulaPCDDecoder>> decoders;
+    std::map<std::string, std::unique_ptr<bag_converter::decoder::NebulaPCDDecoder<>>> decoders;
 
     std::cout << "Scanning for nebula packet topics..." << std::endl;
 
@@ -178,7 +178,7 @@ public:
         }
 
         decoders[topic_metadata.name] =
-          std::make_unique<bag_converter::decoder::NebulaPCDDecoder>(decoder_config);
+          std::make_unique<bag_converter::decoder::NebulaPCDDecoder<>>(decoder_config);
 
         std::cout << "Found a decodable topic: " << topic_metadata.name
                   << " (sensor_model: " << decoder_config.sensor_model

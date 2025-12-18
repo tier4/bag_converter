@@ -8,12 +8,12 @@
 
 #include "seyond_decoder.hpp"
 
-#include <sdk_common/inno_lidar_api.h>
-#include <sdk_common/inno_lidar_packet.h>
-#include <sdk_common/inno_lidar_packet_utils.h>
 #include <rclcpp/rclcpp.hpp>
 
 #include <pcl_conversions/pcl_conversions.h>
+#include <sdk_common/inno_lidar_api.h>
+#include <sdk_common/inno_lidar_packet.h>
+#include <sdk_common/inno_lidar_packet_utils.h>
 
 #include <cstring>
 #include <type_traits>
@@ -35,8 +35,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder::decode(
 {
   pcl::PointCloud<bag_converter::point::PointXYZIT> cloud;
   cloud.header.frame_id = input.header.frame_id.empty() ? config_.frame_id : input.header.frame_id;
-  cloud.header.stamp =
-    input.header.stamp.sec * 1000000ULL + input.header.stamp.nanosec / 1000;
+  cloud.header.stamp = input.header.stamp.sec * 1000000ULL + input.header.stamp.nanosec / 1000;
   cloud.points.reserve(100000);  // Reserve space for points
 
   // Initialize angle HV table if not already initialized
@@ -223,4 +222,3 @@ template void SeyondPCDDecoder::point_xyz_data_parse<const InnoXyzPoint *>(
   bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIT> &);
 
 }  // namespace bag_converter::decoder
-

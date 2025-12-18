@@ -81,8 +81,12 @@ struct NebulaPCDDecoderConfig
  *
  * This class provides the decode interface required by PCDDecoder and directly uses
  * the nebula driver for packet processing.
+ *
+ * @tparam OutputPointT The point type used for output point cloud (default:
+ * bag_converter::point::PointXYZIT)
  */
-class NebulaPCDDecoder : public PCDDecoder<nebula_msgs::msg::NebulaPackets>
+template <typename OutputPointT = bag_converter::point::PointXYZIT>
+class NebulaPCDDecoder : public PCDDecoder<nebula_msgs::msg::NebulaPackets, OutputPointT>
 {
 public:
   /**
