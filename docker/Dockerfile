@@ -67,8 +67,17 @@ RUN curl -sSL https://api.github.com/repos/ros-infrastructure/ros-apt-source/rel
 # Set the working directory
 WORKDIR /opt/drs
 
-# Copy source code
-COPY src/ /opt/drs/src/
+# Copy repos.yaml and import dependencies using vcs
+COPY repos.yaml /opt/drs/
+RUN mkdir src/ && vcs import src < repos.yaml
+
+# Copy source code (repository-specific sources)
+COPY src/bag_converter/ src/bag_converter/
+COPY src/nebula_decoder/ src/nebula_decoder/
+COPY src/seyond_decoder/ src/seyond_decoder/
+COPY src/seyond_nebula_decoder/ src/seyond_nebula_decoder/
+
+
 
 # Initialize rosdep and install dependencies
 RUN rosdep init && \
