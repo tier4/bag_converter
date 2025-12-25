@@ -10,6 +10,7 @@
 #define BAG_CONVERTER__TIMESCALE_HPP
 
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 
 namespace bag_converter::timescale
@@ -30,13 +31,14 @@ inline constexpr double correction_tolerance_sec = 0.35;  // Tolerance for detec
  * This function detects the timescale of the input timestamp by comparing it with
  * a reference timestamp and applies the appropriate correction.
  *
- * @param ref_time_ns Reference timestamp in nanoseconds (known timescale)
- * @param time_ns_to_correct Timestamp to correct in nanoseconds (unknown timescale)
+ * @param target_timestamp Timestamp to correct (unknown timescale) [ns]
+ * @param ref_timestamp Reference timestamp (known timescale) [ns]
  * @param ref_timescale The timescale of the reference timestamp ("utc", "tai", or "gps")
- * @return Corrected timestamp in nanoseconds, aligned to the reference timescale
+ * @return Corrected timestamp aligned to the reference timescale [ns]
+ * @throws std::invalid_argument If ref_timescale is not "utc", "tai", or "gps"
  */
 std::uint64_t correct_timescale(
-  std::uint64_t ref_time_ns, std::uint64_t time_ns_to_correct,
+  std::uint64_t target_timestamp, std::uint64_t ref_timestamp,
   const std::string & ref_timescale = "utc");
 
 }  // namespace bag_converter::timescale
