@@ -15,7 +15,7 @@
 
 namespace fs = std::filesystem;
 
-static const rclcpp::Logger logger = rclcpp::get_logger("bag_converter");
+static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 
 namespace bag_converter
 {
@@ -58,36 +58,35 @@ std::string generate_output_topic(
 
 void print_summary(const std::map<std::string, std::pair<std::string, size_t>> & conversion_counts)
 {
-  RCLCPP_INFO(logger, "========== Conversion Summary ==========");
+  RCLCPP_INFO(g_logger, "========== Conversion Summary ==========");
 
   for (const auto & [input_topic, output_info] : conversion_counts) {
     const auto & [output_topic, count] = output_info;
-    RCLCPP_INFO(logger, "  [%s]", input_topic.c_str());
-    RCLCPP_INFO(logger, "      Destination: %s", output_topic.c_str());
-    RCLCPP_INFO(logger, "      Decoded: %zu messages", count);
+    RCLCPP_INFO(g_logger, "  [%s]", input_topic.c_str());
+    RCLCPP_INFO(g_logger, "      Destination: %s", output_topic.c_str());
+    RCLCPP_INFO(g_logger, "      Decoded: %zu messages", count);
   }
 
-  RCLCPP_INFO(logger, "========================================");
+  RCLCPP_INFO(g_logger, "========================================");
 }
 
 void print_usage(const char * program_name)
 {
-  std::cout
-    << "Usage: " << program_name << " <input_bag> <output_bag> [options]\n"
-    << "\nUnified bag converter for Seyond LiDAR topics.\n"
-    << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
-    << "\nSupported input formats:\n"
-    << "  - nebula_msgs/msg/NebulaPackets (topics containing '/nebula_packets')\n"
-    << "  - seyond/msg/SeyondScan or bag_converter/msg/SeyondScan "
-       "(topics containing '/seyond_packets')\n"
-    << "\nOutput format:\n"
-    << "  - sensor_msgs/msg/PointCloud2 with PointXYZIT fields\n"
-    << "\nOptions:\n"
-    << "  --keep-original           Keep original packet topics in output bag\n"
-    << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
-    << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
-    << "  --point-type <type>       Output point type: xyzit or xyzi (default: xyzit)\n"
-    << "  -h, --help                Show this help message\n";
+  std::cout << "Usage: " << program_name << " <input_bag> <output_bag> [options]\n"
+            << "\nUnified bag converter for Seyond LiDAR topics.\n"
+            << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
+            << "\nSupported input formats:\n"
+            << "  - nebula_msgs/msg/NebulaPackets (topics containing '/nebula_packets')\n"
+            << "  - seyond/msg/SeyondScan or bag_converter/msg/SeyondScan "
+               "(topics containing '/seyond_packets')\n"
+            << "\nOutput format:\n"
+            << "  - sensor_msgs/msg/PointCloud2 with PointXYZIT fields\n"
+            << "\nOptions:\n"
+            << "  --keep-original           Keep original packet topics in output bag\n"
+            << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
+            << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
+            << "  --point-type <type>       Output point type: xyzit or xyzi (default: xyzit)\n"
+            << "  -h, --help                Show this help message\n";
 }
 
 bool parse_arguments(int argc, char ** argv, Config & config)
@@ -150,7 +149,7 @@ std::unique_ptr<decoder::BasePCDDecoder> create_nebula_decoder(
   conversion_counts[topic_name] = {output_topic, 0};
 
   RCLCPP_INFO(
-    logger, "Found NebulaPackets topic: %s -> %s (sensor_model: %s, frame_id: %s)",
+    g_logger, "Found NebulaPackets topic: %s -> %s (sensor_model: %s, frame_id: %s)",
     topic_name.c_str(), output_topic.c_str(), decoder_config.sensor_model.c_str(),
     decoder_config.frame_id.c_str());
 
@@ -177,7 +176,7 @@ std::unique_ptr<decoder::BasePCDDecoder> create_seyond_decoder(
   conversion_counts[topic_name] = {output_topic, 0};
 
   RCLCPP_INFO(
-    logger, "Found SeyondScan topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
+    g_logger, "Found SeyondScan topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
     output_topic.c_str(), decoder_config.frame_id.c_str());
 
   return std::make_unique<decoder::seyond::SeyondPCDDecoder<PointT>>(decoder_config);
@@ -187,7 +186,7 @@ template <typename PointT>
 int run_impl(const Config & config)
 {
   if (!fs::exists(config.input_bag_path)) {
-    RCLCPP_ERROR(logger, "Input bag file does not exist: %s", config.input_bag_path.c_str());
+    RCLCPP_ERROR(g_logger, "Input bag file does not exist: %s", config.input_bag_path.c_str());
     return 1;
   }
 
@@ -199,7 +198,7 @@ int run_impl(const Config & config)
   try {
     reader.open(storage_options_in);
   } catch (const std::exception & e) {
-    RCLCPP_ERROR(logger, "Error opening input bag: %s", e.what());
+    RCLCPP_ERROR(g_logger, "Error opening input bag: %s", e.what());
     return 1;
   }
 
@@ -220,7 +219,7 @@ int run_impl(const Config & config)
   try {
     writer.open(storage_options_out);
   } catch (const std::exception & e) {
-    RCLCPP_ERROR(logger, "Error opening output bag: %s", e.what());
+    RCLCPP_ERROR(g_logger, "Error opening output bag: %s", e.what());
     return 1;
   }
 
@@ -273,7 +272,7 @@ int run_impl(const Config & config)
 
   size_t message_count = 0;
 
-  RCLCPP_INFO(logger, "Processing messages...");
+  RCLCPP_INFO(g_logger, "Processing messages...");
 
   while (reader.has_next()) {
     auto bag_msg = reader.read_next();
@@ -297,7 +296,7 @@ int run_impl(const Config & config)
       writer.write(bag_msg);
 
       if (message_count % 1000 == 0) {
-        RCLCPP_INFO(logger, "Processed %zu messages...", message_count);
+        RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
       }
       continue;
     }
@@ -310,11 +309,9 @@ int run_impl(const Config & config)
     // Create decoder on first encounter
     if (decoders.find(topic_name) == decoders.end()) {
       if (is_nebula) {
-        decoders[topic_name] =
-          create_nebula_decoder<PointT>(topic_name, config, conversion_counts);
+        decoders[topic_name] = create_nebula_decoder<PointT>(topic_name, config, conversion_counts);
       } else {
-        decoders[topic_name] =
-          create_seyond_decoder<PointT>(topic_name, config, conversion_counts);
+        decoders[topic_name] = create_seyond_decoder<PointT>(topic_name, config, conversion_counts);
       }
     }
 
@@ -335,7 +332,7 @@ int run_impl(const Config & config)
     }
 
     if (message_count % 1000 == 0) {
-      RCLCPP_INFO(logger, "Processed %zu messages...", message_count);
+      RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
     }
   }
 
@@ -346,11 +343,11 @@ int run_impl(const Config & config)
 
 int run(const Config & config)
 {
-  RCLCPP_INFO(logger, "Configuration:");
-  RCLCPP_INFO(logger, "  Min range: %.1f m", config.min_range);
-  RCLCPP_INFO(logger, "  Max range: %.1f m", config.max_range);
-  RCLCPP_INFO(logger, "  Point type: %s", config.point_type.c_str());
-  RCLCPP_INFO(logger, "  Keep original topics: %s", config.keep_original_topics ? "yes" : "no");
+  RCLCPP_INFO(g_logger, "Configuration:");
+  RCLCPP_INFO(g_logger, "  Min range: %.1f m", config.min_range);
+  RCLCPP_INFO(g_logger, "  Max range: %.1f m", config.max_range);
+  RCLCPP_INFO(g_logger, "  Point type: %s", config.point_type.c_str());
+  RCLCPP_INFO(g_logger, "  Keep original topics: %s", config.keep_original_topics ? "yes" : "no");
 
   if (config.point_type == "xyzi") {
     return run_impl<point::PointXYZI>(config);
