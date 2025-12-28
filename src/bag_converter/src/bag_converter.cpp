@@ -89,7 +89,7 @@ void print_usage(const char * program_name)
             << "  -h, --help                Show this help message\n";
 }
 
-bool parse_arguments(int argc, char ** argv, Config & config)
+bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
 {
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -104,8 +104,8 @@ bool parse_arguments(int argc, char ** argv, Config & config)
     return false;
   }
 
-  config.input_bag_path = argv[1];
-  config.output_bag_path = argv[2];
+  config.src_bag_path = argv[1];
+  config.dst_bag_path = argv[2];
 
   for (int i = 3; i < argc; i++) {
     std::string arg = argv[i];
@@ -116,9 +116,13 @@ bool parse_arguments(int argc, char ** argv, Config & config)
     } else if (arg == "--max-range" && i + 1 < argc) {
       config.max_range = std::stod(argv[++i]);
     } else if (arg == "--point-type" && i + 1 < argc) {
-      config.point_type = argv[++i];
-      if (config.point_type != "xyzit" && config.point_type != "xyzi") {
-        std::cerr << "Error: Invalid point type '" << config.point_type
+      std::string point_type_str = argv[++i];
+      if (point_type_str == "xyzit") {
+        config.point_type = PointType::kXYZIT;
+      } else if (point_type_str == "xyzi") {
+        config.point_type = PointType::kXYZI;
+      } else {
+        std::cerr << "Error: Invalid point type '" << point_type_str
                   << "'. Must be 'xyzit' or 'xyzi'.\n";
         return false;
       }
@@ -129,70 +133,82 @@ bool parse_arguments(int argc, char ** argv, Config & config)
 }
 
 /**
- * @brief Create a Nebula decoder for the given topic
+ * @brief Driver type for decoder creation
  */
-template <typename PointT>
-std::unique_ptr<decoder::BasePCDDecoder> create_nebula_decoder(
-  const std::string & topic_name, const Config & config,
-  std::map<std::string, std::pair<std::string, size_t>> & conversion_counts)
-{
-  decoder::nebula::NebulaPCDDecoderConfig decoder_config;
-  decoder_config.min_range = config.min_range;
-  decoder_config.max_range = config.max_range;
-
-  auto [frame_id, sensor_model] =
-    extract_sensor_info(topic_name, "/nebula_packets", config.frame_id);
-  decoder_config.frame_id = frame_id;
-  decoder_config.sensor_model = sensor_model;
-
-  std::string output_topic = generate_output_topic(topic_name, "/nebula_packets", "/nebula_points");
-  conversion_counts[topic_name] = {output_topic, 0};
-
-  RCLCPP_INFO(
-    g_logger, "Found NebulaPackets topic: %s -> %s (sensor_model: %s, frame_id: %s)",
-    topic_name.c_str(), output_topic.c_str(), decoder_config.sensor_model.c_str(),
-    decoder_config.frame_id.c_str());
-
-  return std::make_unique<decoder::nebula::NebulaPCDDecoder<PointT>>(decoder_config);
-}
+enum class DriverType { kNebula, kSeyond };
 
 /**
- * @brief Create a Seyond decoder for the given topic
+ * @brief Create a decoder for the given topic based on driver type
+ * @param driver_type The driver type (DriverType::kNebula or DriverType::kSeyond)
+ * @param topic_name The topic name
+ * @param config The converter configuration
+ * @param conversion_counts Map to track conversion counts
+ * @return Unique pointer to the created decoder
  */
 template <typename PointT>
-std::unique_ptr<decoder::BasePCDDecoder> create_seyond_decoder(
-  const std::string & topic_name, const Config & config,
+std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
+  DriverType driver_type, const std::string & topic_name, const BagConverterConfig & config,
   std::map<std::string, std::pair<std::string, size_t>> & conversion_counts)
 {
-  decoder::seyond::SeyondPCDDecoderConfig decoder_config;
-  decoder_config.min_range = config.min_range;
-  decoder_config.max_range = config.max_range;
-  decoder_config.use_reflectance = config.use_reflectance;
+  switch (driver_type) {
+    case DriverType::kNebula: {
+      decoder::nebula::NebulaPCDDecoderConfig decoder_config;
+      decoder_config.min_range = config.min_range;
+      decoder_config.max_range = config.max_range;
 
-  auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
-  decoder_config.frame_id = frame_id;
+      auto [frame_id, sensor_model] =
+        extract_sensor_info(topic_name, "/nebula_packets", config.frame_id);
+      decoder_config.frame_id = frame_id;
+      decoder_config.sensor_model = sensor_model;
 
-  std::string output_topic = generate_output_topic(topic_name, "/seyond_packets", "/seyond_points");
-  conversion_counts[topic_name] = {output_topic, 0};
+      std::string output_topic =
+        generate_output_topic(topic_name, "/nebula_packets", "/nebula_points");
+      conversion_counts[topic_name] = {output_topic, 0};
 
-  RCLCPP_INFO(
-    g_logger, "Found SeyondScan topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
-    output_topic.c_str(), decoder_config.frame_id.c_str());
+      RCLCPP_INFO(
+        g_logger, "Found NebulaPackets topic: %s -> %s (sensor_model: %s, frame_id: %s)",
+        topic_name.c_str(), output_topic.c_str(), decoder_config.sensor_model.c_str(),
+        decoder_config.frame_id.c_str());
 
-  return std::make_unique<decoder::seyond::SeyondPCDDecoder<PointT>>(decoder_config);
+      return std::make_unique<decoder::nebula::NebulaPCDDecoder<PointT>>(decoder_config);
+    }
+
+    case DriverType::kSeyond: {
+      decoder::seyond::SeyondPCDDecoderConfig decoder_config;
+      decoder_config.min_range = config.min_range;
+      decoder_config.max_range = config.max_range;
+      decoder_config.use_reflectance = config.use_reflectance;
+
+      auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
+      decoder_config.frame_id = frame_id;
+
+      std::string output_topic =
+        generate_output_topic(topic_name, "/seyond_packets", "/seyond_points");
+      conversion_counts[topic_name] = {output_topic, 0};
+
+      RCLCPP_INFO(
+        g_logger, "Found SeyondScan topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
+        output_topic.c_str(), decoder_config.frame_id.c_str());
+
+      return std::make_unique<decoder::seyond::SeyondPCDDecoder<PointT>>(decoder_config);
+    }
+  }
+
+  // This should never be reached due to exhaustive switch
+  throw std::logic_error("Unhandled DriverType in create_decoder");
 }
 
 template <typename PointT>
-int run_impl(const Config & config)
+int run_impl(const BagConverterConfig & config)
 {
-  if (!fs::exists(config.input_bag_path)) {
-    RCLCPP_ERROR(g_logger, "Input bag file does not exist: %s", config.input_bag_path.c_str());
+  if (!fs::exists(config.src_bag_path)) {
+    RCLCPP_ERROR(g_logger, "Input bag file does not exist: %s", config.src_bag_path.c_str());
     return 1;
   }
 
   // Open input bag
   rosbag2_storage::StorageOptions storage_options_in;
-  storage_options_in.uri = config.input_bag_path;
+  storage_options_in.uri = config.src_bag_path;
 
   rosbag2_cpp::Reader reader;
   try {
@@ -212,7 +228,7 @@ int run_impl(const Config & config)
 
   // Open output bag
   rosbag2_storage::StorageOptions storage_options_out;
-  storage_options_out.uri = config.output_bag_path;
+  storage_options_out.uri = config.dst_bag_path;
   storage_options_out.storage_id = bag_metadata.storage_identifier;
 
   rosbag2_cpp::Writer writer;
@@ -308,11 +324,8 @@ int run_impl(const Config & config)
 
     // Create decoder on first encounter
     if (decoders.find(topic_name) == decoders.end()) {
-      if (is_nebula) {
-        decoders[topic_name] = create_nebula_decoder<PointT>(topic_name, config, conversion_counts);
-      } else {
-        decoders[topic_name] = create_seyond_decoder<PointT>(topic_name, config, conversion_counts);
-      }
+      DriverType driver_type = is_nebula ? DriverType::kNebula : DriverType::kSeyond;
+      decoders[topic_name] = create_decoder<PointT>(driver_type, topic_name, config, conversion_counts);
     }
 
     // Decode using polymorphic interface
@@ -341,25 +354,39 @@ int run_impl(const Config & config)
   return 0;
 }
 
-int run(const Config & config)
+const char * point_type_to_string(PointType point_type)
 {
-  RCLCPP_INFO(g_logger, "Configuration:");
+  switch (point_type) {
+    case PointType::kXYZIT:
+      return "xyzit";
+    case PointType::kXYZI:
+      return "xyzi";
+  }
+  return "unknown";
+}
+
+int run(const BagConverterConfig & config)
+{
+  RCLCPP_INFO(g_logger, "BagConverterConfiguration:");
   RCLCPP_INFO(g_logger, "  Min range: %.1f m", config.min_range);
   RCLCPP_INFO(g_logger, "  Max range: %.1f m", config.max_range);
-  RCLCPP_INFO(g_logger, "  Point type: %s", config.point_type.c_str());
+  RCLCPP_INFO(g_logger, "  Point type: %s", point_type_to_string(config.point_type));
   RCLCPP_INFO(g_logger, "  Keep original topics: %s", config.keep_original_topics ? "yes" : "no");
 
-  if (config.point_type == "xyzi") {
-    return run_impl<point::PointXYZI>(config);
+  switch (config.point_type) {
+    case PointType::kXYZI:
+      return run_impl<point::PointXYZI>(config);
+    case PointType::kXYZIT:
+      return run_impl<point::PointXYZIT>(config);
   }
-  return run_impl<point::PointXYZIT>(config);
+  return 1;
 }
 
 }  // namespace bag_converter
 
 int main(int argc, char ** argv)
 {
-  bag_converter::Config config;
+  bag_converter::BagConverterConfig config;
   if (!bag_converter::parse_arguments(argc, argv, config)) {
     return 1;
   }

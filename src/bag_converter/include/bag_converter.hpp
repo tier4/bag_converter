@@ -48,18 +48,20 @@ inline constexpr bool keep_original_topics = false;
 
 // Seyond-specific defaults
 inline constexpr bool use_reflectance = false;
-
-// Output point type default
-inline constexpr const char * point_type = "xyzit";
 }  // namespace defaults
+
+/**
+ * @brief Output point type for point cloud conversion
+ */
+enum class PointType { kXYZIT, kXYZI };
 
 /**
  * @brief Configuration for the unified bag converter
  */
-struct Config
+struct BagConverterConfig
 {
-  std::string input_bag_path;
-  std::string output_bag_path;
+  std::string src_bag_path;
+  std::string dst_bag_path;
 
   // Common configuration
   std::string frame_id = defaults::frame_id;
@@ -70,8 +72,8 @@ struct Config
   // Seyond-specific configuration
   bool use_reflectance = defaults::use_reflectance;
 
-  // Output point type: "xyzit" or "xyzi"
-  std::string point_type = defaults::point_type;
+  // Output point type
+  PointType point_type = PointType::kXYZIT;
 };
 
 /**
@@ -108,20 +110,20 @@ void print_summary(const std::map<std::string, std::pair<std::string, size_t>> &
 void print_usage(const char * program_name);
 
 /**
- * @brief Parse command line arguments into Config
+ * @brief Parse command line arguments into BagConverterConfig
  * @param argc Argument count
  * @param argv Argument values
  * @param config Output configuration
  * @return True if parsing successful, false if help was requested or error
  */
-bool parse_arguments(int argc, char ** argv, Config & config);
+bool parse_arguments(int argc, char ** argv, BagConverterConfig & config);
 
 /**
  * @brief Run the bag conversion process
  * @param config The converter configuration
  * @return 0 on success, non-zero on failure
  */
-int run(const Config & config);
+int run(const BagConverterConfig & config);
 
 }  // namespace bag_converter
 
