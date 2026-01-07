@@ -51,11 +51,6 @@ inline constexpr bool use_reflectance = false;
 }  // namespace defaults
 
 /**
- * @brief Output point type for point cloud conversion
- */
-enum class PointType { kXYZIT, kXYZI };
-
-/**
  * @brief Configuration for the unified bag converter
  */
 struct BagConverterConfig

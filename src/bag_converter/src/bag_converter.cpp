@@ -325,7 +325,8 @@ int run_impl(const BagConverterConfig & config)
     // Create decoder on first encounter
     if (decoders.find(topic_name) == decoders.end()) {
       DriverType driver_type = is_nebula ? DriverType::kNebula : DriverType::kSeyond;
-      decoders[topic_name] = create_decoder<PointT>(driver_type, topic_name, config, conversion_counts);
+      decoders[topic_name] =
+        create_decoder<PointT>(driver_type, topic_name, config, conversion_counts);
     }
 
     // Decode using polymorphic interface
@@ -354,23 +355,12 @@ int run_impl(const BagConverterConfig & config)
   return 0;
 }
 
-const char * point_type_to_string(PointType point_type)
-{
-  switch (point_type) {
-    case PointType::kXYZIT:
-      return "xyzit";
-    case PointType::kXYZI:
-      return "xyzi";
-  }
-  return "unknown";
-}
-
 int run(const BagConverterConfig & config)
 {
   RCLCPP_INFO(g_logger, "BagConverterConfiguration:");
   RCLCPP_INFO(g_logger, "  Min range: %.1f m", config.min_range);
   RCLCPP_INFO(g_logger, "  Max range: %.1f m", config.max_range);
-  RCLCPP_INFO(g_logger, "  Point type: %s", point_type_to_string(config.point_type));
+  RCLCPP_INFO(g_logger, "  Point type: %s", point::point_type_to_string(config.point_type));
   RCLCPP_INFO(g_logger, "  Keep original topics: %s", config.keep_original_topics ? "yes" : "no");
 
   switch (config.point_type) {

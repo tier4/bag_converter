@@ -11,6 +11,16 @@
 
 #include <pcl/point_types.h>
 
+namespace bag_converter
+{
+
+/**
+ * @brief Output point type for point cloud conversion
+ */
+enum class PointType { kXYZIT, kXYZI };
+
+}  // namespace bag_converter
+
 namespace bag_converter::point
 {
 
@@ -45,6 +55,22 @@ struct EIGEN_ALIGN16 PointXYZIT
   uint32_t t_us;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
+
+/**
+ * @brief Convert PointType enum to string representation
+ * @param point_type The point type enum value
+ * @return String representation of the point type
+ */
+inline const char * point_type_to_string(bag_converter::PointType point_type)
+{
+  switch (point_type) {
+    case bag_converter::PointType::kXYZIT:
+      return "xyzit";
+    case bag_converter::PointType::kXYZI:
+      return "xyzi";
+  }
+  return "unknown";
+}
 
 }  // namespace bag_converter::point
 
