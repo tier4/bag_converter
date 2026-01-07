@@ -51,6 +51,11 @@ inline constexpr bool use_reflectance = false;
 }  // namespace defaults
 
 /**
+ * @brief Driver type for decoder creation
+ */
+enum class DriverType { kNebula, kSeyond };
+
+/**
  * @brief Configuration for the unified bag converter
  */
 struct BagConverterConfig

@@ -133,11 +133,6 @@ bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
 }
 
 /**
- * @brief Driver type for decoder creation
- */
-enum class DriverType { kNebula, kSeyond };
-
-/**
  * @brief Create a decoder for the given topic based on driver type
  * @param driver_type The driver type (DriverType::kNebula or DriverType::kSeyond)
  * @param topic_name The topic name
