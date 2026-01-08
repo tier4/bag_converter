@@ -27,8 +27,8 @@ RUN set -eux; \
     cp /etc/skel/.bashrc ${USER_HOME}/.bashrc;
 
 # Install dependencies
-RUN apt update && \
-    apt install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
         software-properties-common \
         tzdata \
         locales \
@@ -50,11 +50,11 @@ RUN apt update && \
 # Install ROS2 repository
 RUN curl -sSL https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -Po '"tag_name": "\K.*?(?=")' > /tmp/ros_apt_version && \
     curl -sSL "https://github.com/ros-infrastructure/ros-apt-source/releases/download/$(cat /tmp/ros_apt_version)/ros2-apt-source_$(cat /tmp/ros_apt_version).jammy_all.deb" -o /tmp/ros2-apt-source.deb && \
-    apt update && \
-    apt install -y /tmp/ros2-apt-source.deb && \
+    apt-get update && \
+    apt-get install -y /tmp/ros2-apt-source.deb && \
     rm /tmp/ros2-apt-source.deb /tmp/ros_apt_version && \
-    apt update && \
-    apt install -y --no-install-recommends \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-ros-core \
         ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
         ros-${ROS_DISTRO}-rosbag2-storage-mcap \
@@ -68,12 +68,15 @@ RUN curl -sSL https://api.github.com/repos/ros-infrastructure/ros-apt-source/rel
 WORKDIR /opt/drs
 
 # Copy source code
-COPY src/ /opt/drs/src/
+COPY src/bag_converter /opt/drs/src/bag_converter
+COPY src/dependencies/nebula_drs /opt/drs/src/dependencies/nebula_drs
+COPY src/dependencies/seyond_sdk /opt/drs/src/dependencies/seyond_sdk
+COPY src/dependencies/oxts_ros2_driver /opt/drs/src/dependencies/oxts_ros2_driver
 
 # Initialize rosdep and install dependencies
 RUN rosdep init && \
     rosdep update && \
-    apt update && \
+    apt-get update && \
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon list --packages-up-to bag_converter oxts_msgs | awk '{print $2}' | xargs rosdep install -iry --from-paths && \
     apt-get clean && \
