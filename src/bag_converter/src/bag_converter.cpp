@@ -77,10 +77,9 @@ void print_usage(const char * program_name)
             << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
             << "\nSupported input formats:\n"
             << "  - nebula_msgs/msg/NebulaPackets (topics containing '/nebula_packets')\n"
-            << "  - seyond/msg/SeyondScan or bag_converter/msg/SeyondScan "
-               "(topics containing '/seyond_packets')\n"
+            << "  - seyond/msg/SeyondScan (topics containing '/seyond_packets')\n"
             << "\nOutput format:\n"
-            << "  - sensor_msgs/msg/PointCloud2 with PointXYZIT fields\n"
+            << "  - sensor_msgs/msg/PointCloud2 (point type specified by --point-type)\n"
             << "\nOptions:\n"
             << "  --keep-original           Keep original packet topics in output bag\n"
             << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
@@ -296,8 +295,7 @@ int run_impl(const BagConverterConfig & config)
     const auto & topic_type = topic_metadata.type;
 
     bool is_nebula = (topic_type == "nebula_msgs/msg/NebulaPackets");
-    bool is_seyond =
-      (topic_type == "seyond/msg/SeyondScan" || topic_type == "bag_converter/msg/SeyondScan");
+    bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
 
     if (is_nebula || is_seyond) {
       // Create point cloud output topic
@@ -354,8 +352,7 @@ int run_impl(const BagConverterConfig & config)
     const auto & topic_type = type_it->second;
 
     bool is_nebula = (topic_type == "nebula_msgs/msg/NebulaPackets");
-    bool is_seyond =
-      (topic_type == "seyond/msg/SeyondScan" || topic_type == "bag_converter/msg/SeyondScan");
+    bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
 
     if (!is_nebula && !is_seyond) {
       // Other messages: pass through
