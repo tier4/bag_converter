@@ -1,6 +1,6 @@
 FROM ros:humble-ros-base
 
-SHELL ["/bin/bash", "-c"]
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Set timezone
 ENV DEBIAN_FRONTEND=noninteractive
@@ -13,16 +13,16 @@ ARG PARALLEL_JOBS=4
 
 # Create or modify a non-root user based on the provided UID/GID
 RUN set -eux; \
-    EXISTING_USER=$(getent passwd ${USER_ID} | cut -d: -f1 || true); \
-    EXISTING_GROUP=$(getent group ${GROUP_ID} | cut -d: -f1 || true); \
+    EXISTING_USER=$(getent passwd "${USER_ID}" | cut -d: -f1 || true); \
+    EXISTING_GROUP=$(getent group "${GROUP_ID}" | cut -d: -f1 || true); \
     if [ -n "${EXISTING_USER}" ]; then \
-        usermod -l ${USER_NAME} ${EXISTING_USER}; \
-        groupmod -n ${USER_NAME} ${EXISTING_GROUP}; \
+        usermod -l "${USER_NAME}" "${EXISTING_USER}"; \
+        groupmod -n "${USER_NAME}" "${EXISTING_GROUP}"; \
     else \
-        groupadd -g ${GROUP_ID} ${USER_NAME}; \
-        useradd -m -u ${USER_ID} -g ${GROUP_ID} -s /bin/bash ${USER_NAME}; \
+        groupadd -g "${GROUP_ID}" "${USER_NAME}"; \
+        useradd -l -m -u "${USER_ID}" -g "${GROUP_ID}" -s /bin/bash "${USER_NAME}"; \
     fi; \
-    cp /etc/skel/.bashrc ${USER_HOME}/.bashrc;
+    cp /etc/skel/.bashrc "${USER_HOME}/.bashrc";
 
 # Install additional ROS packages not in ros-base
 RUN apt-get update && \
@@ -44,16 +44,16 @@ COPY src/dependencies/oxts_ros2_driver /opt/drs/src/dependencies/oxts_ros2_drive
 # Install dependencies via rosdep
 RUN rosdep update && \
     apt-get update && \
-    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source /opt/ros/"${ROS_DISTRO}"/setup.bash && \
     colcon list --packages-up-to bag_converter oxts_msgs | awk '{print $2}' | xargs rosdep install -iry --from-paths && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Build ROS packages
-RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
-    colcon build --symlink-install --parallel-workers ${PARALLEL_JOBS} --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to bag_converter oxts_msgs
+RUN source /opt/ros/"${ROS_DISTRO}"/setup.bash && \
+    colcon build --symlink-install --parallel-workers "${PARALLEL_JOBS}" --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to bag_converter oxts_msgs
 
 # Switch to the non-root user
-USER ${USER_NAME}
+USER "${USER_NAME}"
 
 ENTRYPOINT ["/bin/bash", "-c", "source /opt/drs/install/setup.bash && exec \"$@\"", "--"]

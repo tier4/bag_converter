@@ -149,8 +149,7 @@ public:
    * @brief Get configuration
    * @return Current decoder configuration
    */
-  // NOLINTNEXTLINE(modernize-use-nodiscard)
-  NebulaPCDDecoderConfig get_config() const;
+  [[nodiscard]] NebulaPCDDecoderConfig get_config() const;
 
   /**
    * @brief Set configuration

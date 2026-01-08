@@ -3,7 +3,7 @@
 set -e
 
 show_help() {
-    cat << EOF
+    cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
 Build the bag_converter Docker image.
@@ -30,28 +30,28 @@ PARALLEL_JOBS=4
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        --no-cache)
-            NO_CACHE_FLAG="--no-cache"
-            shift
-            ;;
-        --parallel-jobs|-j)
-            PARALLEL_JOBS="$2"
-            shift 2
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Run '$(basename "$0") --help' for usage."
-            exit 1
-            ;;
+    -h | --help)
+        show_help
+        exit 0
+        ;;
+    --no-cache)
+        NO_CACHE_FLAG="--no-cache"
+        shift
+        ;;
+    --parallel-jobs | -j)
+        PARALLEL_JOBS="$2"
+        shift 2
+        ;;
+    *)
+        echo "Unknown option: $1"
+        echo "Run '$(basename "$0") --help' for usage."
+        exit 1
+        ;;
     esac
 done
 
 # Build the image from parent directory
 docker build $NO_CACHE_FLAG -t bag_converter:latest -f docker/Dockerfile . \
-    --build-arg USER_ID=$(id -u) \
-    --build-arg GROUP_ID=$(id -g) \
-    --build-arg PARALLEL_JOBS=${PARALLEL_JOBS}
+    --build-arg USER_ID="$(id -u)" \
+    --build-arg GROUP_ID="$(id -g)" \
+    --build-arg PARALLEL_JOBS="${PARALLEL_JOBS}"

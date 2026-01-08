@@ -17,20 +17,20 @@ fi
 if [ $# -ge 2 ]; then
     INPUT_PATH="$1"
     OUTPUT_PATH="$2"
-    
+
     # Get absolute paths (use -m for output to allow non-existent paths)
     INPUT_ABS=$(realpath "$INPUT_PATH" 2>/dev/null || echo "$INPUT_PATH")
     OUTPUT_ABS=$(realpath -m "$OUTPUT_PATH" 2>/dev/null || echo "$OUTPUT_PATH")
-    
+
     # Get directory paths for Docker volume mounting
     INPUT_DIR=$(dirname "$INPUT_ABS")
     OUTPUT_DIR=$(dirname "$OUTPUT_ABS")
     INPUT_FILE=$(basename "$INPUT_ABS")
     OUTPUT_FILE=$(basename "$OUTPUT_ABS")
-    
+
     # Shift to get remaining arguments (options)
     shift 2
-    
+
     # Run the bag converter using Docker with volume mounts
     # Replace input and output paths with Docker container paths
     docker run -it --rm \

@@ -12,6 +12,7 @@
 #include "point_types.hpp"
 
 #include <rclcpp/serialization.hpp>
+
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <pcl/point_cloud.h>
