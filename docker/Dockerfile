@@ -9,6 +9,7 @@ ARG USER_ID=9999
 ARG GROUP_ID=9999
 ARG USER_NAME=user
 ARG USER_HOME=/home/user
+ARG PARALLEL_JOBS=4
 
 # Create or modify a non-root user based on the provided UID/GID
 RUN set -eux; \
@@ -50,7 +51,7 @@ RUN rosdep update && \
 
 # Build ROS packages
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
-    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to bag_converter oxts_msgs
+    colcon build --symlink-install --parallel-workers ${PARALLEL_JOBS} --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to bag_converter oxts_msgs
 
 # Copy entrypoint
 ADD docker/entrypoint.sh /
