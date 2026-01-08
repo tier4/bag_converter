@@ -53,11 +53,7 @@ RUN rosdep update && \
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --parallel-workers ${PARALLEL_JOBS} --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to bag_converter oxts_msgs
 
-# Copy entrypoint
-ADD docker/entrypoint.sh /
-RUN chown ${USER_ID}:${GROUP_ID} /entrypoint.sh && chmod +x /entrypoint.sh
-
 # Switch to the non-root user
 USER ${USER_NAME}
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "-c", "source /opt/drs/install/setup.bash && exec \"$@\"", "--"]
