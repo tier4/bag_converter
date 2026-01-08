@@ -133,6 +133,40 @@ bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
 }
 
 /**
+ * @brief Finalize output bag: move storage file to dst_bag_path and clean up temp directory
+ * @return true on success, false on failure
+ */
+bool finalize_output_bag(const fs::path & temp_dir, const fs::path & dst_path)
+{
+  std::error_code ec;
+
+  // Find the storage file in temp directory (any file that is not metadata.yaml)
+  fs::path storage_file;
+  for (const auto & entry : fs::directory_iterator(temp_dir, ec)) {
+    if (entry.path().filename() != "metadata.yaml") {
+      storage_file = entry.path();
+      break;
+    }
+  }
+
+  if (storage_file.empty()) {
+    RCLCPP_ERROR(g_logger, "No storage file found in temp directory");
+    return false;
+  }
+
+  // Move storage file to destination
+  fs::rename(storage_file, dst_path, ec);
+  if (ec) {
+    RCLCPP_ERROR(g_logger, "Failed to move bag file: %s", ec.message().c_str());
+    return false;
+  }
+
+  // Remove temp directory
+  fs::remove_all(temp_dir, ec);
+  return true;
+}
+
+/**
  * @brief Create a decoder for the given topic based on driver type
  * @param driver_type The driver type (DriverType::kNebula or DriverType::kSeyond)
  * @param topic_name The topic name
@@ -201,6 +235,27 @@ int run_impl(const BagConverterConfig & config)
     return 1;
   }
 
+  const fs::path dst_path(config.dst_bag_path);
+  const fs::path temp_dir = dst_path.string() + "_tmp";
+
+  // Create parent directory if needed
+  if (dst_path.has_parent_path() && !fs::exists(dst_path.parent_path())) {
+    RCLCPP_INFO(g_logger, "Creating output directory: %s", dst_path.parent_path().c_str());
+    fs::create_directories(dst_path.parent_path());
+  }
+
+  // Remove existing output file if present
+  if (fs::exists(dst_path)) {
+    RCLCPP_INFO(g_logger, "Removing existing output file: %s", dst_path.c_str());
+    fs::remove(dst_path);
+  }
+
+  // Remove existing temp directory if present
+  if (fs::exists(temp_dir)) {
+    RCLCPP_INFO(g_logger, "Removing existing temp directory: %s", temp_dir.c_str());
+    fs::remove_all(temp_dir);
+  }
+
   // Open input bag
   rosbag2_storage::StorageOptions storage_options_in;
   storage_options_in.uri = config.src_bag_path;
@@ -221,9 +276,9 @@ int run_impl(const BagConverterConfig & config)
     topic_types[topic_info.topic_metadata.name] = topic_info.topic_metadata.type;
   }
 
-  // Open output bag
+  // Open output bag (write to temp directory)
   rosbag2_storage::StorageOptions storage_options_out;
-  storage_options_out.uri = config.dst_bag_path;
+  storage_options_out.uri = temp_dir.string();
   storage_options_out.storage_id = bag_metadata.storage_identifier;
 
   rosbag2_cpp::Writer writer;
@@ -347,6 +402,13 @@ int run_impl(const BagConverterConfig & config)
 
   print_summary(conversion_counts);
 
+  // Close writer and finalize output
+  writer.close();
+  if (!finalize_output_bag(temp_dir, dst_path)) {
+    return 1;
+  }
+
+  RCLCPP_INFO(g_logger, "Output written to: %s", dst_path.c_str());
   return 0;
 }
 
