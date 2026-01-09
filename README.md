@@ -4,6 +4,8 @@
 
 `bag_converter` is a tool for converting rosbag2 files containing Nebula packets to PointCloud2 messages. The tool decodes Nebula packet topics (`/nebula_packets`) and converts them to point cloud topics (`/nebula_points`).
 
+**Supported storage formats:** mcap, sqlite3
+
 ## Install
 
 ```shell
@@ -22,7 +24,31 @@ cd docker
 ## Usage
 
 ```shell
-./bag_converter <path-to-intput-mcap> <path-to-output-mcap>
+./bag_converter <path-to-input-mcap> <path-to-output-mcap> [options]
+```
+
+### Options
+
+| Option                | Description                                    |
+| --------------------- | ---------------------------------------------- |
+| `--help`, `-h`        | Show help message                              |
+| `--point-type <type>` | Output point type: `xyzit` (default) or `xyzi` |
+| `--keep-original`     | Keep original packet topics in output bag      |
+
+### Examples
+
+```shell
+# Basic conversion
+./bag_converter input.mcap output.mcap
+
+# Show help
+./bag_converter --help
+
+# Specify output point type (xyzi without timestamp field)
+./bag_converter input.mcap output.mcap --point-type xyzi
+
+# Keep original packet topics in output
+./bag_converter input.mcap output.mcap --keep-original
 ```
 
 ## Message Types
