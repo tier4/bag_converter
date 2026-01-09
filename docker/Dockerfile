@@ -38,9 +38,11 @@ WORKDIR /opt/drs
 # Copy repos.yaml and import dependencies using vcs
 COPY repos.yaml /opt/drs/
 RUN mkdir src/ && vcs import src < repos.yaml
+COPY src/bag_converter /opt/drs/src/bag_converter
 
 # Initialize rosdep and install dependencies
-RUN rosdep update && \
+RUN rosdep init || true && \
+    rosdep update && \
     apt-get update && \
     source /opt/ros/"${ROS_DISTRO}"/setup.bash && \
     colcon list --packages-up-to bag_converter oxts_msgs | awk '{print $2}' | xargs rosdep install -iry --from-paths && \
