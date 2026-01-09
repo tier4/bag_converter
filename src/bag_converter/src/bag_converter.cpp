@@ -56,15 +56,15 @@ std::string generate_output_topic(
   return input_topic.substr(0, pos) + output_suffix;
 }
 
-void print_summary(const std::map<std::string, std::pair<std::string, size_t>> & conversion_counts)
+void print_summary(const std::map<std::string, BagConverterStats> & conversion_stats)
 {
   RCLCPP_INFO(g_logger, "========== Conversion Summary ==========");
 
-  for (const auto & [input_topic, output_info] : conversion_counts) {
-    const auto & [output_topic, count] = output_info;
+  for (const auto & [input_topic, stats] : conversion_stats) {
     RCLCPP_INFO(g_logger, "  [%s]", input_topic.c_str());
-    RCLCPP_INFO(g_logger, "      Destination: %s", output_topic.c_str());
-    RCLCPP_INFO(g_logger, "      Decoded: %zu messages", count);
+    RCLCPP_INFO(g_logger, "      Destination: %s", stats.output_topic.c_str());
+    RCLCPP_INFO(g_logger, "      Decoded: %zu messages", stats.decoded_count);
+    RCLCPP_INFO(g_logger, "      Skipped: %zu messages", stats.skipped_count);
   }
 
   RCLCPP_INFO(g_logger, "========================================");
@@ -202,13 +202,13 @@ bool finalize_output_bag(const fs::path & temp_dir, const fs::path & dst_path)
  * @param driver_type The driver type (DriverType::kNebula or DriverType::kSeyond)
  * @param topic_name The topic name
  * @param config The converter configuration
- * @param conversion_counts Map to track conversion counts
+ * @param conversion_stats Map to track conversion counts
  * @return Unique pointer to the created decoder
  */
 template <typename PointT>
 std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
   DriverType driver_type, const std::string & topic_name, const BagConverterConfig & config,
-  std::map<std::string, std::pair<std::string, size_t>> & conversion_counts)
+  std::map<std::string, BagConverterStats> & conversion_stats)
 {
   switch (driver_type) {
     case DriverType::kNebula: {
@@ -223,7 +223,7 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
 
       std::string output_topic =
         generate_output_topic(topic_name, "/nebula_packets", "/nebula_points");
-      conversion_counts[topic_name] = {output_topic, 0};
+      conversion_stats[topic_name] = {output_topic, 0, 0};
 
       RCLCPP_INFO(
         g_logger, "Found NebulaPackets topic: %s -> %s (sensor_model: %s, frame_id: %s)",
@@ -244,7 +244,7 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
 
       std::string output_topic =
         generate_output_topic(topic_name, "/seyond_packets", "/seyond_points");
-      conversion_counts[topic_name] = {output_topic, 0};
+      conversion_stats[topic_name] = {output_topic, 0, 0};
 
       RCLCPP_INFO(
         g_logger, "Found SeyondScan topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
@@ -363,8 +363,8 @@ int run_impl(const BagConverterConfig & config)
   // Unified decoder map using polymorphism (type erasure pattern)
   std::map<std::string, std::unique_ptr<decoder::BasePCDDecoder>> decoders;
 
-  // Topic output mapping and conversion counts: input_topic -> (output_topic, count)
-  std::map<std::string, std::pair<std::string, size_t>> conversion_counts;
+  // Topic output mapping and conversion statistics
+  std::map<std::string, BagConverterStats> conversion_stats;
 
   size_t message_count = 0;
 
@@ -405,7 +405,7 @@ int run_impl(const BagConverterConfig & config)
     if (decoders.find(topic_name) == decoders.end()) {
       DriverType driver_type = is_nebula ? DriverType::kNebula : DriverType::kSeyond;
       decoders[topic_name] =
-        create_decoder<PointT>(driver_type, topic_name, config, conversion_counts);
+        create_decoder<PointT>(driver_type, topic_name, config, conversion_stats);
     }
 
     // Decode using polymorphic interface
@@ -414,6 +414,14 @@ int run_impl(const BagConverterConfig & config)
     auto pointcloud_msg = decoder->decode(serialized_msg);
 
     if (pointcloud_msg) {
+      // Skip status packets (messages with too few points)
+      const size_t num_points = pointcloud_msg->width * pointcloud_msg->height;
+      if (num_points < defaults::min_points_per_scan) {
+        RCLCPP_INFO(g_logger, "Status packets detected (skipped decoding this message)");
+        conversion_stats[topic_name].skipped_count++;
+        continue;
+      }
+
       if (config.timescale_correction) {
         const std::uint64_t sensor_time_ns =
           static_cast<std::uint64_t>(pointcloud_msg->header.stamp.sec) * 1000000000 +
@@ -431,10 +439,10 @@ int run_impl(const BagConverterConfig & config)
       pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
 
       writer.write(
-        pc2_msg_serialized, conversion_counts[topic_name].first, "sensor_msgs/msg/PointCloud2",
-        rclcpp::Time(bag_msg->time_stamp));
+        pc2_msg_serialized, conversion_stats[topic_name].output_topic,
+        "sensor_msgs/msg/PointCloud2", rclcpp::Time(bag_msg->time_stamp));
 
-      conversion_counts[topic_name].second++;
+      conversion_stats[topic_name].decoded_count++;
     }
 
     if (message_count % 1000 == 0) {
@@ -442,7 +450,7 @@ int run_impl(const BagConverterConfig & config)
     }
   }
 
-  print_summary(conversion_counts);
+  print_summary(conversion_stats);
 
   // Close writer and finalize output
   writer.close();

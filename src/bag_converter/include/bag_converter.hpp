@@ -57,6 +57,16 @@ inline constexpr bool use_reflectance = false;
 enum class DriverType { kNebula, kSeyond };
 
 /**
+ * @brief Statistics for bag conversion per topic
+ */
+struct BagConverterStats
+{
+  std::string output_topic;
+  size_t decoded_count = 0;
+  size_t skipped_count = 0;
+};
+
+/**
  * @brief Configuration for the unified bag converter
  */
 struct BagConverterConfig
@@ -104,9 +114,9 @@ std::string generate_output_topic(
 
 /**
  * @brief Print conversion summary
- * @param conversion_counts Conversion counts per topic (input -> (output, count))
+ * @param conversion_stats Conversion statistics per topic
  */
-void print_summary(const std::map<std::string, std::pair<std::string, size_t>> & conversion_counts);
+void print_summary(const std::map<std::string, BagConverterStats> & conversion_stats);
 
 /**
  * @brief Print usage information
