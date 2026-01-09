@@ -72,20 +72,28 @@ void print_summary(const std::map<std::string, std::pair<std::string, size_t>> &
 
 void print_usage(const char * program_name)
 {
-  std::cout << "Usage: " << program_name << " <input_bag> <output_bag> [options]\n"
-            << "\nUnified bag converter for Seyond LiDAR topics.\n"
-            << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
-            << "\nSupported input formats:\n"
-            << "  - nebula_msgs/msg/NebulaPackets (topics containing '/nebula_packets')\n"
-            << "  - seyond/msg/SeyondScan (topics containing '/seyond_packets')\n"
-            << "\nOutput format:\n"
-            << "  - sensor_msgs/msg/PointCloud2 (point type specified by --point-type)\n"
-            << "\nOptions:\n"
-            << "  --keep-original           Keep original packet topics in output bag\n"
-            << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
-            << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
-            << "  --point-type <type>       Output point type: xyzit or xyzi (default: xyzit)\n"
-            << "  -h, --help                Show this help message\n";
+  std::cout
+    << "Usage: " << program_name << " <input_bag> <output_bag> [options]\n"
+    << "\nUnified bag converter for Seyond LiDAR topics.\n"
+    << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
+    << "\nSupported input formats:\n"
+    << "  - nebula_msgs/msg/NebulaPackets (topics containing '/nebula_packets')\n"
+    << "  - seyond/msg/SeyondScan (topics containing '/seyond_packets')\n"
+    << "\nOutput format:\n"
+    << "  - sensor_msgs/msg/PointCloud2 (point type specified by --point-type)\n"
+    << "\nTimescale correction:\n"
+    << "  Detects the timescale of the sensor timestamp (from LiDAR) by comparing it with\n"
+    << "  the rosbag recording time, and corrects it to match the recording timescale.\n"
+    << "  Supported timescales: UTC, TAI (+37s from UTC), GPS (+18s from UTC).\n"
+    << "  Use --timescale-correction-ref to specify the rosbag recording timescale.\n"
+    << "\nOptions:\n"
+    << "  --keep-original           Keep original packet topics in output bag\n"
+    << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
+    << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
+    << "  --point-type <type>       Output point type: xyzit or xyzi (default: xyzit)\n"
+    << "  --timescale-correction <on|off>  Enable/disable timescale correction (default: on)\n"
+    << "  --timescale-correction-ref <utc|tai|gps>  Rosbag recording timescale (default: utc)\n"
+    << "  -h, --help                Show this help message\n";
 }
 
 bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
@@ -125,6 +133,30 @@ bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
                   << "'. Must be 'xyzit' or 'xyzi'.\n";
         return false;
       }
+    } else if (arg == "--timescale-correction" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "on") {
+        config.timescale_correction = true;
+      } else if (value == "off") {
+        config.timescale_correction = false;
+      } else {
+        std::cerr << "Error: Invalid value for --timescale-correction '" << value
+                  << "'. Must be 'on' or 'off'.\n";
+        return false;
+      }
+    } else if (arg == "--timescale-correction-ref" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "utc" || value == "tai" || value == "gps") {
+        config.timescale_correction_ref = value;
+      } else {
+        std::cerr << "Error: Invalid value for --timescale-correction-ref '" << value
+                  << "'. Must be 'utc', 'tai', or 'gps'.\n";
+        return false;
+      }
+    } else {
+      std::cerr << "Error: Unknown option '" << arg << "'.\n";
+      print_usage(argv[0]);
+      return false;
     }
   }
 
@@ -382,6 +414,19 @@ int run_impl(const BagConverterConfig & config)
     auto pointcloud_msg = decoder->decode(serialized_msg);
 
     if (pointcloud_msg) {
+      if (config.timescale_correction) {
+        const std::uint64_t sensor_time_ns =
+          static_cast<std::uint64_t>(pointcloud_msg->header.stamp.sec) * 1000000000 +
+          static_cast<std::uint64_t>(pointcloud_msg->header.stamp.nanosec);
+        const std::uint64_t sensor_time_ns_corrected = timescale::correct_timescale(
+          sensor_time_ns, rclcpp::Time(bag_msg->time_stamp).nanoseconds(),
+          config.timescale_correction_ref);
+        if (sensor_time_ns_corrected != sensor_time_ns) {
+          pointcloud_msg->header.stamp.sec = sensor_time_ns_corrected / 1000000000;
+          pointcloud_msg->header.stamp.nanosec = sensor_time_ns_corrected % 1000000000;
+        }
+      }
+
       auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
       pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
 
@@ -416,6 +461,8 @@ int run(const BagConverterConfig & config)
   RCLCPP_INFO(g_logger, "  Max range: %.1f m", config.max_range);
   RCLCPP_INFO(g_logger, "  Point type: %s", point::point_type_to_string(config.point_type));
   RCLCPP_INFO(g_logger, "  Keep original topics: %s", config.keep_original_topics ? "yes" : "no");
+  RCLCPP_INFO(g_logger, "  Timescale correction: %s", config.timescale_correction ? "on" : "off");
+  RCLCPP_INFO(g_logger, "  Timescale correction ref: %s", config.timescale_correction_ref.c_str());
 
   switch (config.point_type) {
     case PointType::kXYZI:

@@ -13,6 +13,7 @@
 #include "nebula_decoder.hpp"
 #include "point_types.hpp"
 #include "seyond_decoder.hpp"
+#include "timescale.hpp"
 
 #include <bag_converter/msg/seyond_scan.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -74,6 +75,10 @@ struct BagConverterConfig
 
   // Output point type
   PointType point_type = PointType::kXYZIT;
+
+  // Timescale correction
+  bool timescale_correction = true;
+  std::string timescale_correction_ref = "utc";
 };
 
 /**

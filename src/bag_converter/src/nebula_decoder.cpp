@@ -109,11 +109,6 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
   // Create PointCloud2 message
   auto pc2_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
   pcl::toROSMsg(pc2_cloud, *pc2_msg);
-
-  // Set header timestamp from input message
-  pc2_msg->header.stamp = input.header.stamp;
-  pc2_msg->header.frame_id = config_.frame_id;
-
   return pc2_msg;
 }
 
