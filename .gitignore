@@ -15,7 +15,7 @@ log/
 
 # Dependencies
 /src/dependencies/nebula_drs/
-/src/seyond_decoder/src/seyond_sdk/
+/src/dependencies/seyond_sdk/
 /src/dependencies/oxts_ros2_driver/
 
 # rosbags

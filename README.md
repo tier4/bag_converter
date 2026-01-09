@@ -5,6 +5,7 @@
 `bag_converter` is a tool for converting rosbag2 files containing Nebula packets to PointCloud2 messages. The tool decodes Nebula packet topics (`/nebula_packets`) and converts them to point cloud topics (`/nebula_points`).
 
 ## Install
+
 ```shell
 # clone repository
 git clone https://github.com/tier4/bag_converter.git
@@ -18,8 +19,8 @@ cd docker
 ./build.sh --no-cache
 ```
 
-
 ## Usage
+
 ```shell
 ./bag_converter <path-to-intput-mcap> <path-to-output-mcap>
 ```
@@ -57,7 +58,8 @@ All timestamps in PointCloud2 messages are based on UTC (Coordinated Universal T
 - **`t_us` field**: Relative timestamp in microseconds from the scan start time (`header.stamp`)
 
 The absolute timestamp for each point (in nanoseconds, UTC) can be calculated as:
-```
+
+```text
 absolute_timestamp_ns = (header.stamp.sec * 1,000,000,000 + header.stamp.nanosec) + (t_us * 1,000) nanoseconds
 ```
 

@@ -8,7 +8,9 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <depend>rosidl_default_runtime</depend>
   <depend>rclcpp</depend>
   <depend>rosbag2_cpp</depend>
   <depend>rosbag2_storage</depend>
@@ -18,10 +20,12 @@
   <depend>sensor_msgs</depend>
   <depend>nebula_msgs</depend>
   <depend>std_msgs</depend>
-  <depend>seyond_decoder</depend>
-  <depend>seyond_nebula_decoder</depend>
+  <depend>nebula_decoders</depend>
+  <depend>nebula_common</depend>
   <depend>pcl_conversions</depend>
   <depend>builtin_interfaces</depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

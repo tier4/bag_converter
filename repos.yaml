@@ -1,13 +1,15 @@
+---
 repositories:
   dependencies/nebula_drs:
     type: git
     url: https://github.com/tier4/nebula_drs.git
     version: v0.1.1
-  seyond_decoder/src/seyond_sdk:
+  dependencies/seyond_sdk:
     type: git
     url: https://github.com/Seyond-Inc/inno-lidar-sdk.git
-    version: e7e40ca635605447dbf8d73735706aee56b13f70  # main
+    version: e7e40ca635605447dbf8d73735706aee56b13f70 # main
   dependencies/oxts_ros2_driver:
     type: git
     url: https://github.com/tier4/oxts_ros2_driver.git
-    version: 022d160e13e378bdfe34e5222a0e89f3a51cf081  # feat/data_recording_system
+    version: >-
+      022d160e13e378bdfe34e5222a0e89f3a51cf081  # feat/data_recording_system
