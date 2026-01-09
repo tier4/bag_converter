@@ -35,13 +35,11 @@ RUN apt-get update && \
 # Set the working directory
 WORKDIR /opt/drs
 
-# Copy source code
-COPY src/bag_converter /opt/drs/src/bag_converter
-COPY src/dependencies/nebula_drs /opt/drs/src/dependencies/nebula_drs
-COPY src/dependencies/seyond_sdk /opt/drs/src/dependencies/seyond_sdk
-COPY src/dependencies/oxts_ros2_driver /opt/drs/src/dependencies/oxts_ros2_driver
+# Copy repos.yaml and import dependencies using vcs
+COPY repos.yaml /opt/drs/
+RUN mkdir src/ && vcs import src < repos.yaml
 
-# Install dependencies via rosdep
+# Initialize rosdep and install dependencies
 RUN rosdep update && \
     apt-get update && \
     source /opt/ros/"${ROS_DISTRO}"/setup.bash && \
