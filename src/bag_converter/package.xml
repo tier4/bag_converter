@@ -24,6 +24,8 @@
   <depend>nebula_common</depend>
   <depend>pcl_conversions</depend>
   <depend>builtin_interfaces</depend>
+  <depend>can_msgs</depend>
+  <depend>oxts_msgs</depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>
 
