@@ -96,19 +96,19 @@ void print_usage(const char * program_name)
     << "  -h, --help                Show this help message\n";
 }
 
-bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
+std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & config)
 {
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--help" || arg == "-h") {
       print_usage(argv[0]);
-      return false;
+      return 0;  // Help requested, exit with success
     }
   }
 
   if (argc < 3) {
     print_usage(argv[0]);
-    return false;
+    return 1;  // Error: missing arguments
   }
 
   config.src_bag_path = argv[1];
@@ -131,7 +131,7 @@ bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
       } else {
         std::cerr << "Error: Invalid point type '" << point_type_str
                   << "'. Must be 'xyzit' or 'xyzi'.\n";
-        return false;
+        return 1;
       }
     } else if (arg == "--timescale-correction" && i + 1 < argc) {
       std::string value = argv[++i];
@@ -142,7 +142,7 @@ bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
       } else {
         std::cerr << "Error: Invalid value for --timescale-correction '" << value
                   << "'. Must be 'on' or 'off'.\n";
-        return false;
+        return 1;
       }
     } else if (arg == "--timescale-correction-ref" && i + 1 < argc) {
       std::string value = argv[++i];
@@ -151,16 +151,16 @@ bool parse_arguments(int argc, char ** argv, BagConverterConfig & config)
       } else {
         std::cerr << "Error: Invalid value for --timescale-correction-ref '" << value
                   << "'. Must be 'utc', 'tai', or 'gps'.\n";
-        return false;
+        return 1;
       }
     } else {
       std::cerr << "Error: Unknown option '" << arg << "'.\n";
       print_usage(argv[0]);
-      return false;
+      return 1;
     }
   }
 
-  return true;
+  return std::nullopt;
 }
 
 /**
@@ -486,8 +486,9 @@ int run(const BagConverterConfig & config)
 int main(int argc, char ** argv)
 {
   bag_converter::BagConverterConfig config;
-  if (!bag_converter::parse_arguments(argc, argv, config)) {
-    return 1;
+  auto parse_result = bag_converter::parse_arguments(argc, argv, config);
+  if (parse_result.has_value()) {
+    return parse_result.value();
   }
 
   rclcpp::init(argc, argv);

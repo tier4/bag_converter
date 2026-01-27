@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -129,9 +130,9 @@ void print_usage(const char * program_name);
  * @param argc Argument count
  * @param argv Argument values
  * @param config Output configuration
- * @return True if parsing successful, false if help was requested or error
+ * @return std::nullopt if parsing successful, exit code otherwise (0 for help, 1 for error)
  */
-bool parse_arguments(int argc, char ** argv, BagConverterConfig & config);
+std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & config);
 
 /**
  * @brief Run the bag conversion process
