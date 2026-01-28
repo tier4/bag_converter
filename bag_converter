@@ -1,14 +1,17 @@
 #!/bin/sh
 
+# Docker image tag
+IMAGE_TAG="latest"
+
 # Check if Docker is installed
 if ! command -v docker >/dev/null 2>&1; then
     echo "Error: Docker is not installed. Please install Docker from https://docs.docker.com/engine/install/"
     exit 1
 fi
 
-# Check if bag_converter:latest image exists
-if ! docker image inspect bag_converter:latest >/dev/null 2>&1; then
-    echo "Error: Docker image 'bag_converter:latest' not found. Please build it first by running: cd bag_converter/docker && ./build.sh"
+# Check if bag_converter:${IMAGE_TAG} image exists
+if ! docker image inspect bag_converter:${IMAGE_TAG} >/dev/null 2>&1; then
+    echo "Error: Docker image 'bag_converter:${IMAGE_TAG}' not found. Please build it first by running: cd bag_converter/docker && ./build.sh"
     exit 1
 fi
 
@@ -38,11 +41,11 @@ if [ $# -ge 2 ]; then
         -v "$OUTPUT_DIR":/output \
         -e INPUT_FILE="$INPUT_FILE" \
         -e OUTPUT_FILE="$OUTPUT_FILE" \
-        bag_converter:latest \
+        bag_converter:${IMAGE_TAG} \
         sh -c 'ros2 run bag_converter bag_converter "/input/$INPUT_FILE" "/output/$OUTPUT_FILE" "$@"' -- "$@"
 else
     # Pass all arguments directly to the binary (let it handle errors)
     docker run -it --rm \
-        bag_converter:latest \
+        bag_converter:${IMAGE_TAG} \
         ros2 run bag_converter bag_converter "$@"
 fi
