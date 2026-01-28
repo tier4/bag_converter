@@ -10,6 +10,7 @@ ARG GROUP_ID=9999
 ARG USER_NAME=user
 ARG USER_HOME=/home/user
 ARG PARALLEL_JOBS=4
+ARG VERSION=latest
 
 # Create or modify a non-root user based on the provided UID/GID
 RUN set -eux; \
@@ -51,7 +52,7 @@ RUN rosdep init || true && \
 
 # Build ROS packages
 RUN source /opt/ros/"${ROS_DISTRO}"/setup.bash && \
-    colcon build --symlink-install --parallel-workers "${PARALLEL_JOBS}" --cmake-args -DCMAKE_BUILD_TYPE=Release --packages-up-to bag_converter
+    colcon build --symlink-install --parallel-workers "${PARALLEL_JOBS}" --cmake-args -DCMAKE_BUILD_TYPE=Release -DBAG_CONVERTER_VERSION="${VERSION}" --packages-up-to bag_converter
 
 # Switch to the non-root user
 USER "${USER_NAME}"

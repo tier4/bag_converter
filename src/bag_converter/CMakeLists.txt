@@ -70,6 +70,12 @@ add_executable(bag_converter_bin
 
 set_target_properties(bag_converter_bin PROPERTIES OUTPUT_NAME bag_converter)
 
+# Set version from build argument (default: "latest")
+if(NOT DEFINED BAG_CONVERTER_VERSION)
+  set(BAG_CONVERTER_VERSION "latest")
+endif()
+target_compile_definitions(bag_converter_bin PRIVATE BAG_CONVERTER_VERSION="${BAG_CONVERTER_VERSION}")
+
 target_include_directories(bag_converter_bin PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${SEYOND_SDK_PATH}/src

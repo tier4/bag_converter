@@ -93,7 +93,13 @@ void print_usage(const char * program_name)
     << "  --point-type <type>       Output point type: xyzit or xyzi (default: xyzit)\n"
     << "  --timescale-correction <on|off>  Enable/disable timescale correction (default: on)\n"
     << "  --timescale-correction-ref <utc|tai|gps>  Rosbag recording timescale (default: utc)\n"
-    << "  -h, --help                Show this help message\n";
+    << "  -h, --help                Show this help message\n"
+    << "  -v, --version             Show version information\n";
+}
+
+void print_version()
+{
+  std::cout << BAG_CONVERTER_VERSION << std::endl;
 }
 
 std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & config)
@@ -103,6 +109,10 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
     if (arg == "--help" || arg == "-h") {
       print_usage(argv[0]);
       return 0;  // Help requested, exit with success
+    }
+    if (arg == "--version" || arg == "-v") {
+      print_version();
+      return 0;  // Version requested, exit with success
     }
   }
 
