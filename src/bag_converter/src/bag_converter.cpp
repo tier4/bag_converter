@@ -380,7 +380,7 @@ int run_impl(const BagConverterConfig & config)
 
   RCLCPP_INFO(g_logger, "Processing messages...");
 
-  while (reader.has_next()) {
+  while (rclcpp::ok() && reader.has_next()) {
     auto bag_msg = reader.read_next();
     message_count++;
 
@@ -458,6 +458,10 @@ int run_impl(const BagConverterConfig & config)
     if (message_count % 1000 == 0) {
       RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
     }
+  }
+
+  if (!rclcpp::ok()) {
+    RCLCPP_WARN(g_logger, "Interrupted by user (Ctrl+C), conversion terminated early");
   }
 
   print_summary(conversion_stats);
