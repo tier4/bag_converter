@@ -23,14 +23,14 @@ from sensor_msgs_py import point_cloud2 as pc2
 import rosbag2_py
 
 
-def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show: int = 100, delay: float | None = None):
+def decode_pointcloud2(bag_path: str, topic_name: str = None, point_step: int = 10000, delay: float | None = None):
     """
     Decode PointCloud2 messages from a rosbag2 file.
 
     Args:
         bag_path: Path to the rosbag2 directory or file
         topic_name: Optional topic name to filter. If None, reads all PointCloud2 topics.
-        max_points_to_show: Maximum number of points to display per message (default: 100)
+        point_step: Step size for displaying points (e.g., 1000 means show every 1000th point)
         delay: Delay between messages in seconds (default: None, no delay)
     """
     # Initialize ROS 2 (required for message deserialization)
@@ -90,6 +90,7 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
         # Dictionary: topic_name -> list of timestamps
         scan_timestamps_per_topic = {}  # topic -> list of scan timestamps in nanoseconds
         receive_timestamps_per_topic = {}  # topic -> list of receive timestamps in nanoseconds
+        t_us_ranges_per_topic = {}  # topic -> list of (max_t_us - min_t_us) per message
 
         try:
             # Read messages
@@ -112,6 +113,7 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
                 if topic not in scan_timestamps_per_topic:
                     scan_timestamps_per_topic[topic] = []
                     receive_timestamps_per_topic[topic] = []
+                    t_us_ranges_per_topic[topic] = []
 
                 # Store timestamps for interval calculation
                 # Scan time: convert from sec + nanosec to nanoseconds
@@ -137,6 +139,11 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
                     base_time_us = None
                     if 't_us' in points and len(points['t_us']) > 0:
                         base_time_us = msg.header.stamp.sec * 1_000_000 + msg.header.stamp.nanosec // 1_000
+                        # Calculate t_us range (max - min) for this message
+                        t_us_min = np.min(points['t_us'])
+                        t_us_max = np.max(points['t_us'])
+                        t_us_range = t_us_max - t_us_min
+                        t_us_ranges_per_topic[topic].append(t_us_range)
 
                     # Convert timestamp from nanoseconds to seconds and nanoseconds
                     received_sec = timestamp // 1_000_000_000
@@ -149,11 +156,11 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
                     print(f"  Number of points decoded: {num_points}")
                     print(f"  Available fields: {', '.join(field_names)}")
 
-                    # Show summary of first N points
-                    num_points_to_show = min(max_points_to_show, num_points)
-                    print(f"  First {num_points_to_show} points:")
+                    # Show points at regular intervals (every point_step points)
+                    points_to_show = list(range(0, num_points, point_step))
+                    print(f"  Points (every {point_step} points, {len(points_to_show)} shown):")
 
-                    for i in range(num_points_to_show):
+                    for i in points_to_show:
                         # Build point info string dynamically
                         point_info_parts = []
                         stamp_str = None
@@ -224,6 +231,15 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, max_points_to_show
                     print(f"    Maximum: {np.max(receive_intervals):.9f} seconds ({np.max(receive_intervals)*1000:.6f} ms)")
                     print(f"    Average: {np.mean(receive_intervals):.9f} seconds ({np.mean(receive_intervals)*1000:.6f} ms)")
                     print(f"    Std Dev: {np.std(receive_intervals):.9f} seconds ({np.std(receive_intervals)*1000:.6f} ms)")
+
+                    # t_us range statistics (if available)
+                    if topic in t_us_ranges_per_topic and len(t_us_ranges_per_topic[topic]) > 0:
+                        t_us_ranges = np.array(t_us_ranges_per_topic[topic])
+                        print(f"  t_us Range per Message (max - min):")
+                        print(f"    Minimum: {np.min(t_us_ranges):.0f} us ({np.min(t_us_ranges)/1000:.3f} ms)")
+                        print(f"    Maximum: {np.max(t_us_ranges):.0f} us ({np.max(t_us_ranges)/1000:.3f} ms)")
+                        print(f"    Average: {np.mean(t_us_ranges):.0f} us ({np.mean(t_us_ranges)/1000:.3f} ms)")
+                        print(f"    Std Dev: {np.std(t_us_ranges):.0f} us ({np.std(t_us_ranges)/1000:.3f} ms)")
 
                 print("="*60)
         except KeyboardInterrupt:
@@ -359,11 +375,11 @@ Examples:
     )
 
     parser.add_argument(
-        '--max-points-to-show',
+        '--point-step',
         type=int,
-        default=25,
+        default=10000,
         metavar='N',
-        help='Maximum number of points to display per message (default: 25)'
+        help='Show every Nth point per scan (default: 10000)'
     )
 
     parser.add_argument(
@@ -378,19 +394,19 @@ Examples:
 
     bag_path = args.bag_path
     topic_name = args.topic
-    max_points_to_show = args.max_points_to_show
+    point_step = args.point_step
     delay = args.delay
 
     if not Path(bag_path).exists():
         parser.error(f"Bag path does not exist: {bag_path}")
 
-    if max_points_to_show < 0:
-        parser.error("--max-points-to-show must be non-negative")
+    if point_step < 1:
+        parser.error("--point-step must be at least 1")
 
     if delay is not None and delay < 0:
         parser.error("--delay must be non-negative")
 
-    decode_pointcloud2(bag_path, topic_name, max_points_to_show, delay)
+    decode_pointcloud2(bag_path, topic_name, point_step, delay)
 
 
 if __name__ == '__main__':

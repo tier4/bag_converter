@@ -25,7 +25,7 @@ namespace bag_converter::decoder::seyond
 // SeyondPCDDecoder implementation
 template <typename OutputPointT>
 SeyondPCDDecoder<OutputPointT>::SeyondPCDDecoder(const SeyondPCDDecoderConfig & config)
-: config_(config), anglehv_table_init_(false), current_ts_start_(0.0)
+: config_(config), anglehv_table_init_(false), scan_start_us_(0.0), pkt_offset_us_(0.0)
 {
   data_buffer_.resize(defaults::data_buffer_size_bytes);
 }
@@ -56,6 +56,17 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
           "Angle HV table initialized (size: %zu bytes)", packet.data.size());
         break;
       }
+    }
+  }
+
+  // Find the first POINTS packet to get the scan start time
+  scan_start_us_ = 0.0;
+  for (const auto & packet : input.packets) {
+    if (
+      packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS && !packet.data.empty()) {
+      const auto * pkt = reinterpret_cast<const InnoDataPacket *>(packet.data.data());
+      scan_start_us_ = pkt->common.ts_start_us;
+      break;
     }
   }
 
@@ -126,8 +137,8 @@ template <typename OutputPointT>
 void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
   const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud)
 {
-  // Calculate the scan start timestamp
-  current_ts_start_ = pkt->common.ts_start_us / us_in_second_c;
+  // Calculate the packet's time offset from scan start (in microseconds)
+  pkt_offset_us_ = pkt->common.ts_start_us - scan_start_us_;
 
   // Parse point data based on packet type (different lidars use different structures)
   if (CHECK_EN_XYZ_POINTCLOUD_DATA(pkt->type)) {
@@ -170,10 +181,11 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
     }
 
     // Set timestamp (convert to microseconds from scan start)
-    // point_ptr->ts_10us is in 10 microsecond units
-    // Convert to microseconds: ts_10us * 10 = microseconds
+    // point_ptr->ts_10us is relative to the packet's ts_start_us (in 10us units)
+    // pkt_offset_us_ is the packet's offset from scan start (in us)
+    // point.t_us = pkt_offset_us_ + (ts_10us * 10) = time from scan start in us
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT>) {
-      point.t_us = point_ptr->ts_10us * 10;
+      point.t_us = static_cast<uint32_t>(pkt_offset_us_ + point_ptr->ts_10us * 10);
     }
 
     // Apply coordinate transformation (Autoware coordinate system)

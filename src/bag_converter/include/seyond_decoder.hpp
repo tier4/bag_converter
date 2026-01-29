@@ -142,7 +142,10 @@ private:
   bool anglehv_table_init_;
   std::vector<char> anglehv_table_;
   std::vector<uint8_t> data_buffer_;
-  double current_ts_start_;
+
+  // Timestamp tracking for relative time calculation
+  double scan_start_us_;  // Scan start time in microseconds (epoch time)
+  double pkt_offset_us_;  // Current packet's offset from scan start in microseconds
 
   static constexpr double us_in_second_c = 1000000.0;
   static constexpr double ten_us_in_second_c = 100000.0;
