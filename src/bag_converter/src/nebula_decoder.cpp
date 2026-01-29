@@ -101,7 +101,8 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
     pc2_pt.z = pt.z;
     pc2_pt.intensity = pt.intensity;
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT>) {
-      pc2_pt.t_us = pt.time_stamp;
+      // Convert from nanoseconds to microseconds
+      pc2_pt.t_us = pt.time_stamp / 1000;
     }
     pc2_cloud.push_back(pc2_pt);
   }
