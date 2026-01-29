@@ -108,8 +108,8 @@ python scripts/decode_pointcloud2.py <path-to-bag>
 # Decode a specific topic
 python scripts/decode_pointcloud2.py <path-to-bag> --topic /sensing/lidar/front/nebula_points
 
-# Limit the number of points displayed per message
-python scripts/decode_pointcloud2.py <path-to-bag> --max-points-to-show 10
+# Show every 500th point per scan (default: 10000)
+python scripts/decode_pointcloud2.py <path-to-bag> --point-step 500
 
 # Add delay between messages (in seconds)
 python scripts/decode_pointcloud2.py <path-to-bag> --delay 0.1
