@@ -277,6 +277,14 @@ int run_impl(const BagConverterConfig & config)
   }
 
   const fs::path dst_path(config.dst_bag_path);
+
+  // Check if input and output paths refer to the same file
+  if (fs::exists(dst_path) && fs::canonical(config.src_bag_path) == fs::canonical(dst_path)) {
+    RCLCPP_ERROR(
+      g_logger, "Input and output bag paths must not be the same: %s", config.src_bag_path.c_str());
+    return 1;
+  }
+
   const fs::path temp_dir = dst_path.string() + "_tmp";
 
   // Create parent directory if needed
