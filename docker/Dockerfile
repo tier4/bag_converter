@@ -39,7 +39,9 @@ WORKDIR /opt/drs
 # Copy repos.yaml and import dependencies using vcs
 COPY repos.yaml /opt/drs/
 RUN mkdir src/ && vcs import src < repos.yaml
-COPY src/bag_converter /opt/drs/src/bag_converter
+
+# Copy only package.xml first for dependency resolution (cached unless package.xml changes)
+COPY src/bag_converter/package.xml /opt/drs/src/bag_converter/package.xml
 
 # Initialize rosdep and install dependencies
 RUN rosdep init || true && \
@@ -49,6 +51,9 @@ RUN rosdep init || true && \
     colcon list --packages-up-to bag_converter | awk '{print $2}' | xargs rosdep install -iry --from-paths && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Copy full source for building
+COPY src/bag_converter /opt/drs/src/bag_converter
 
 # Build ROS packages
 RUN source /opt/ros/"${ROS_DISTRO}"/setup.bash && \
