@@ -15,6 +15,12 @@ if ! docker image inspect bag_converter:${IMAGE_TAG} >/dev/null 2>&1; then
     exit 1
 fi
 
+# Use -it when running in a TTY, -i otherwise
+DOCKER_FLAGS="-i"
+if [ -t 0 ]; then
+    DOCKER_FLAGS="-it"
+fi
+
 # If we have at least 2 arguments, treat first two as input/output paths for Docker volume mounting
 # Otherwise, pass all arguments directly to the binary
 if [ $# -ge 2 ]; then
@@ -36,7 +42,7 @@ if [ $# -ge 2 ]; then
 
     # Run the bag converter using Docker with volume mounts
     # Replace input and output paths with Docker container paths
-    docker run -it --rm \
+    docker run $DOCKER_FLAGS --rm \
         -v "$INPUT_DIR":/input \
         -v "$OUTPUT_DIR":/output \
         -e INPUT_FILE="$INPUT_FILE" \
@@ -45,7 +51,7 @@ if [ $# -ge 2 ]; then
         sh -c 'ros2 run bag_converter bag_converter "/input/$INPUT_FILE" "/output/$OUTPUT_FILE" "$@"' -- "$@"
 else
     # Pass all arguments directly to the binary (let it handle errors)
-    docker run -it --rm \
+    docker run $DOCKER_FLAGS --rm \
         bag_converter:${IMAGE_TAG} \
         ros2 run bag_converter bag_converter "$@"
 fi
