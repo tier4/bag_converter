@@ -24,6 +24,20 @@ cd docker
 ./build.sh --no-cache
 ```
 
+### Switching Versions
+
+To use a specific version, checkout the corresponding tag and rebuild:
+
+```shell
+# list available versions
+git tag
+
+# checkout a specific version and rebuild
+git checkout v0.4.0
+cd docker
+./build.sh
+```
+
 ## Usage
 
 ```shell
