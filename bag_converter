@@ -21,9 +21,21 @@ if [ -t 0 ]; then
     DOCKER_FLAGS="-it"
 fi
 
-# If we have at least 2 arguments, treat first two as input/output paths for Docker volume mounting
-# Otherwise, pass all arguments directly to the binary
-if [ $# -ge 2 ]; then
+# Batch mode: mount input/output as directories
+if [ "$1" = "--batch" ] && [ $# -ge 3 ]; then
+    shift # consume --batch
+    INPUT_ABS=$(realpath "$1")
+    OUTPUT_ABS=$(realpath -m "$2")
+    shift 2
+
+    docker run $DOCKER_FLAGS --rm \
+        -v "$INPUT_ABS":/input:ro \
+        -v "$OUTPUT_ABS":/output \
+        bag_converter:${IMAGE_TAG} \
+        ros2 run bag_converter bag_converter --batch /input /output "$@"
+
+# Single file mode: mount input/output parent directories
+elif [ $# -ge 2 ]; then
     INPUT_PATH="$1"
     OUTPUT_PATH="$2"
 

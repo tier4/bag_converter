@@ -34,6 +34,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace bag_converter
 {
@@ -90,6 +91,9 @@ struct BagConverterConfig
   // Timescale correction
   bool timescale_correction = true;
   std::string timescale_correction_ref = "utc";
+
+  // Batch mode
+  bool batch_mode = false;
 };
 
 /**
@@ -140,6 +144,25 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
  * @return 0 on success, non-zero on failure
  */
 int run(const BagConverterConfig & config);
+
+/**
+ * @brief Result tracking for batch conversion
+ */
+struct BatchResult
+{
+  size_t success_count = 0;
+  size_t fail_count = 0;
+  size_t skip_count = 0;
+  std::vector<std::string> failed_files;
+  std::vector<std::string> skipped_files;
+};
+
+/**
+ * @brief Run batch conversion on all bag files in a directory
+ * @param config The converter configuration (src_bag_path = input dir, dst_bag_path = output dir)
+ * @return 0 if all succeeded, 1 if any failed
+ */
+int run_batch(const BagConverterConfig & config);
 
 }  // namespace bag_converter
 

@@ -42,6 +42,7 @@ cd docker
 
 ```shell
 ./bag_converter <path-to-input-mcap> <path-to-output-mcap> [options]
+./bag_converter --batch <input-dir> <output-dir> [options]
 ```
 
 ### Options
@@ -49,6 +50,7 @@ cd docker
 | Option                | Description                                    |
 | --------------------- | ---------------------------------------------- |
 | `--help`, `-h`        | Show help message                              |
+| `--batch`             | Process all bag files in a directory           |
 | `--point-type <type>` | Output point type: `xyzit` (default) or `xyzi` |
 | `--keep-original`     | Keep original packet topics in output bag      |
 
@@ -67,6 +69,20 @@ cd docker
 # Keep original packet topics in output
 ./bag_converter input.mcap output.mcap --keep-original
 ```
+
+### Batch Mode
+
+Use `--batch` to convert all bag files (`.mcap`, `.db3`, `.sqlite3`) in a directory with a single invocation. The directory structure is mirrored in the output, and output filenames match the input filenames.
+
+```shell
+# Convert all bag files in a directory
+./bag_converter --batch /path/to/input_dir /path/to/output_dir
+
+# Batch conversion with options
+./bag_converter --batch /path/to/input_dir /path/to/output_dir --point-type xyzi
+```
+
+Batch mode is idempotent: re-running the same command skips files whose output already exists. If a file fails to convert, the error is logged and processing continues with the remaining files.
 
 ## Message Types
 
