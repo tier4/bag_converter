@@ -533,10 +533,16 @@ static std::vector<fs::path> find_bag_files(const fs::path & input_dir)
   static const std::set<std::string> bag_extensions = {".mcap", ".db3", ".sqlite3"};
   std::vector<fs::path> files;
 
-  for (const auto & entry : fs::recursive_directory_iterator(input_dir)) {
-    if (entry.is_regular_file() && bag_extensions.count(entry.path().extension().string()) > 0) {
-      files.push_back(entry.path());
+  try {
+    for (const auto & entry : fs::recursive_directory_iterator(input_dir)) {
+      if (entry.is_regular_file() && bag_extensions.count(entry.path().extension().string()) > 0) {
+        files.push_back(entry.path());
+      }
     }
+  } catch (const fs::filesystem_error & e) {
+    RCLCPP_WARN(
+      g_logger, "Error while traversing input directory '%s': %s",
+      input_dir.string().c_str(), e.what());
   }
 
   std::sort(files.begin(), files.end());
