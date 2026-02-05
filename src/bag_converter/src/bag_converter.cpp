@@ -385,9 +385,10 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
   }
 
   if (transformer && !has_tf_topic) {
-    RCLCPP_WARN(
-      g_logger, "Skipping conversion: no TF topics found in %s", config.src_bag_path.c_str());
-    return BagConverterResultStatus::kSkipped;
+    RCLCPP_ERROR(
+      g_logger, "No TF topics found in %s. Cannot transform to frame '%s'",
+      config.src_bag_path.c_str(), config.frame.c_str());
+    return BagConverterResultStatus::kError;
   }
 
   if (transformer && !has_tf_messages) {
