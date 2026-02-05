@@ -108,6 +108,8 @@ void print_usage(const char * program_name)
     << "                            In both modes, TF data is pre-loaded before processing,\n"
     << "                            so transforms are available even if TF messages appear\n"
     << "                            after point cloud messages in the bag.\n"
+    << "  --min-conf-level <0-3>    [Experimental] Min packet confidence (Falcon only)\n"
+    << "                            (default: 0, no filtering). Filters at packet level.\n"
     << "  -h, --help                Show this help message\n"
     << "  -v, --version             Show version information\n";
 }
@@ -183,6 +185,13 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
                   << "'. Must be 'utc', 'tai', or 'gps'.\n";
         return 1;
       }
+    } else if (arg == "--min-conf-level" && i + 1 < argc) {
+      int level = std::stoi(argv[++i]);
+      if (level < 0 || level > 3) {
+        std::cerr << "Error: --min-conf-level must be between 0 and 3.\n";
+        return 1;
+      }
+      config.min_conf_level = level;
     } else if (arg == "--base-frame" && i + 1 < argc) {
       config.frame = argv[++i];
     } else if (arg == "--tf-mode" && i + 1 < argc) {
@@ -281,6 +290,7 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
       decoder_config.min_range = config.min_range;
       decoder_config.max_range = config.max_range;
       decoder_config.use_reflectance = config.use_reflectance;
+      decoder_config.min_conf_level = config.min_conf_level;
 
       auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
       decoder_config.frame_id = frame_id;

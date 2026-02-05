@@ -49,13 +49,14 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 
 ### Options
 
-| Option                        | Description                                     |
-| ----------------------------- | ----------------------------------------------- |
-| `--help`, `-h`                | Show help message                               |
-| `--point-type <type>`         | Output point type: `xyzit` (default) or `xyzi`  |
-| `--keep-original`             | Keep original packet topics in output bag       |
-| `--base-frame <frame>`        | Transform PointCloud2 to the specified TF frame |
-| `--tf-mode <static\|dynamic>` | TF mode: `static` (default) or `dynamic`        |
+| Option                        | Description                                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `--help`, `-h`                | Show help message                                                                                                                 |
+| `--point-type <type>`         | Output point type: `xyzit` (default) or `xyzi`                                                                                    |
+| `--keep-original`             | Keep original packet topics in output bag                                                                                         |
+| `--base-frame <frame>`        | Transform PointCloud2 to the specified TF frame                                                                                   |
+| `--tf-mode <static\|dynamic>` | TF mode: `static` (default) or `dynamic`                                                                                          |
+| `--min-conf-level <0-3>`      | **[Experimental]** Minimum packet confidence level (default: `0`, no filtering). Only effective for SeyondScan with Falcon LiDAR. |
 
 The `--base-frame` option transforms all output PointCloud2 messages to the specified coordinate frame using TF data (`tf2_msgs/msg/TFMessage`) from the input bag. The `--tf-mode` option controls how TF data is handled:
 
@@ -90,6 +91,9 @@ In both modes, TF data is pre-loaded from the bag before processing begins, so t
 
 # Transform with dynamic (time-dependent) TF
 ./bag_converter input.mcap output.mcap --base-frame base_link --tf-mode dynamic
+
+# Filter Seyond packets with low confidence level
+./bag_converter input.mcap output.mcap --min-conf-level 2
 ```
 
 ## Message Types
