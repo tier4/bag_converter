@@ -32,6 +32,9 @@ find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common io)
 find_package(Eigen3 REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_msgs REQUIRED)
+find_package(tf2_sensor_msgs REQUIRED)
 
 # Generate Seyond messages
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -66,6 +69,7 @@ add_executable(bag_converter_bin
   src/seyond_decoder.cpp
   src/nebula_decoder.cpp
   src/timescale.cpp
+  src/tf_transformer.cpp
 )
 
 set_target_properties(bag_converter_bin PROPERTIES OUTPUT_NAME bag_converter)
@@ -103,6 +107,9 @@ ament_target_dependencies(bag_converter_bin
   pcl_conversions
   nebula_decoders
   nebula_common
+  tf2
+  tf2_msgs
+  tf2_sensor_msgs
 )
 
 # Link with message generation
