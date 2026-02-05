@@ -91,7 +91,7 @@ void print_usage(const char * program_name)
     << "  Use --timescale-correction-ref to specify the rosbag recording timescale.\n"
     << "\nOptions:\n"
     << "  --batch                   Process all bag files in a directory\n"
-    << "  --force                   Overwrite existing output files\n"
+    << "  --force                   Overwrite existing output files (batch mode only)\n"
     << "  --keep-original           Keep original packet topics in output bag\n"
     << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
     << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
