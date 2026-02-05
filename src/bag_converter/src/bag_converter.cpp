@@ -594,7 +594,14 @@ int run_batch(const BagConverterConfig & config)
   // Create output directory if needed
   if (!fs::exists(output_dir)) {
     RCLCPP_INFO(g_logger, "Creating output directory: %s", output_dir.c_str());
-    fs::create_directories(output_dir);
+    std::error_code create_ec;
+    fs::create_directories(output_dir, create_ec);
+    if (create_ec) {
+      RCLCPP_ERROR(
+        g_logger, "Failed to create output directory %s: %s", output_dir.c_str(),
+        create_ec.message().c_str());
+      return 1;
+    }
   }
 
   // Find bag files
