@@ -41,8 +41,11 @@ cd docker
 ## Usage
 
 ```shell
-./bag_converter <path-to-input-mcap> <path-to-output-mcap> [options]
+./bag_converter <input_bag> <output_bag> [options]
+./bag_converter <input_dir> <output_dir> [options]
 ```
+
+If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in it are automatically converted.
 
 ### Options
 
@@ -66,7 +69,15 @@ cd docker
 
 # Keep original packet topics in output
 ./bag_converter input.mcap output.mcap --keep-original
+
+# Convert all bag files in a directory (batch mode)
+./bag_converter /path/to/input_dir /path/to/output_dir
+
+# Batch mode with options
+./bag_converter /path/to/input_dir /path/to/output_dir --point-type xyzi
 ```
+
+When the input path is a directory, all bag files are converted automatically. The directory structure is mirrored in the output, and output filenames match the input filenames. All options are applied to every file. If a file fails to convert, the error is logged and processing continues with the remaining files.
 
 ## Message Types
 

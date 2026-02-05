@@ -21,9 +21,23 @@ if [ -t 0 ]; then
     DOCKER_FLAGS="-it"
 fi
 
-# If we have at least 2 arguments, treat first two as input/output paths for Docker volume mounting
-# Otherwise, pass all arguments directly to the binary
-if [ $# -ge 2 ]; then
+# Directory mode: mount input/output as directories
+if [ $# -ge 2 ] && [ -d "$1" ]; then
+    INPUT_ABS=$(realpath "$1")
+    OUTPUT_ABS=$(realpath -m "$2")
+    shift 2
+
+    # Create output directory on host so Docker doesn't create it as root
+    mkdir -p "$OUTPUT_ABS"
+
+    docker run $DOCKER_FLAGS --rm \
+        -v "$INPUT_ABS":/input:ro \
+        -v "$OUTPUT_ABS":/output \
+        bag_converter:${IMAGE_TAG} \
+        ros2 run bag_converter bag_converter /input /output "$@"
+
+# Single file mode: mount input/output parent directories
+elif [ $# -ge 2 ]; then
     INPUT_PATH="$1"
     OUTPUT_PATH="$2"
 
