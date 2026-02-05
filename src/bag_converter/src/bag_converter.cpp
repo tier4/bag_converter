@@ -91,6 +91,7 @@ void print_usage(const char * program_name)
     << "  Use --timescale-correction-ref to specify the rosbag recording timescale.\n"
     << "\nOptions:\n"
     << "  --batch                   Process all bag files in a directory\n"
+    << "  --force                   Overwrite existing output files\n"
     << "  --keep-original           Keep original packet topics in output bag\n"
     << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
     << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
@@ -139,6 +140,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
     std::string arg = argv[i];
     if (arg == "--batch") {
       config.batch_mode = true;
+    } else if (arg == "--force") {
+      config.force = true;
     } else if (arg == "--keep-original") {
       config.keep_original_topics = true;
     } else if (arg == "--min-range" && i + 1 < argc) {
@@ -613,8 +616,8 @@ int run_batch(const BagConverterConfig & config)
 
     RCLCPP_INFO(g_logger, "[%zu/%zu] Processing: %s", i + 1, bag_files.size(), relative.c_str());
 
-    // Skip if output already exists (idempotent re-run)
-    if (fs::exists(output_path)) {
+    // Skip if output already exists (unless --force is set)
+    if (fs::exists(output_path) && !config.force) {
       RCLCPP_INFO(g_logger, "  Skipping (output already exists): %s", output_path.c_str());
       result.skip_count++;
       result.skipped_files.push_back(relative.string());

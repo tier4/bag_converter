@@ -51,6 +51,7 @@ cd docker
 | --------------------- | ---------------------------------------------- |
 | `--help`, `-h`        | Show help message                              |
 | `--batch`             | Process all bag files in a directory           |
+| `--force`             | Overwrite existing output files                |
 | `--point-type <type>` | Output point type: `xyzit` (default) or `xyzi` |
 | `--keep-original`     | Keep original packet topics in output bag      |
 

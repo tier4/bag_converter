@@ -94,6 +94,7 @@ struct BagConverterConfig
 
   // Batch mode
   bool batch_mode = false;
+  bool force = false;
 };
 
 /**
