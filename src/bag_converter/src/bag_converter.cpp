@@ -279,11 +279,11 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
 }
 
 template <typename PointT>
-int run_impl(const BagConverterConfig & config)
+BagConverterResultStatus run_impl(const BagConverterConfig & config)
 {
   if (!fs::exists(config.src_bag_path)) {
     RCLCPP_ERROR(g_logger, "Input bag file does not exist: %s", config.src_bag_path.c_str());
-    return 1;
+    return BagConverterResultStatus::kError;
   }
 
   const fs::path dst_path(config.dst_bag_path);
@@ -292,7 +292,7 @@ int run_impl(const BagConverterConfig & config)
   if (fs::exists(dst_path) && fs::canonical(config.src_bag_path) == fs::canonical(dst_path)) {
     RCLCPP_ERROR(
       g_logger, "Input and output bag paths must not be the same: %s", config.src_bag_path.c_str());
-    return 1;
+    return BagConverterResultStatus::kError;
   }
 
   const fs::path temp_dir = dst_path.string() + "_tmp";
@@ -324,15 +324,27 @@ int run_impl(const BagConverterConfig & config)
     reader.open(storage_options_in);
   } catch (const std::exception & e) {
     RCLCPP_ERROR(g_logger, "Error opening input bag: %s", e.what());
-    return 1;
+    return BagConverterResultStatus::kError;
   }
 
   const auto bag_metadata = reader.get_metadata();
 
-  // Build topic type map from metadata
+  // Build topic type map from metadata and check for decodable topics
   std::map<std::string, std::string> topic_types;
+  bool has_decodable_topics = false;
   for (const auto & topic_info : bag_metadata.topics_with_message_count) {
     topic_types[topic_info.topic_metadata.name] = topic_info.topic_metadata.type;
+    const auto & type = topic_info.topic_metadata.type;
+    if (type == "nebula_msgs/msg/NebulaPackets" || type == "seyond/msg/SeyondScan") {
+      has_decodable_topics = true;
+    }
+  }
+
+  if (!has_decodable_topics) {
+    RCLCPP_WARN(
+      g_logger, "Skipping conversion: no decodable topics found in %s",
+      config.src_bag_path.c_str());
+    return BagConverterResultStatus::kSkipped;
   }
 
   // Open output bag (write to temp directory)
@@ -345,7 +357,7 @@ int run_impl(const BagConverterConfig & config)
     writer.open(storage_options_out);
   } catch (const std::exception & e) {
     RCLCPP_ERROR(g_logger, "Error opening output bag: %s", e.what());
-    return 1;
+    return BagConverterResultStatus::kError;
   }
 
   // Create output topics based on input metadata
@@ -487,14 +499,14 @@ int run_impl(const BagConverterConfig & config)
   // Close writer and finalize output
   writer.close();
   if (!finalize_output_bag(temp_dir, dst_path)) {
-    return 1;
+    return BagConverterResultStatus::kError;
   }
 
   RCLCPP_INFO(g_logger, "Output written to: %s", dst_path.c_str());
-  return 0;
+  return BagConverterResultStatus::kSuccess;
 }
 
-static int run_single(const BagConverterConfig & config)
+static BagConverterResultStatus run_single(const BagConverterConfig & config)
 {
   switch (config.point_type) {
     case PointType::kXYZI:
@@ -502,7 +514,7 @@ static int run_single(const BagConverterConfig & config)
     case PointType::kXYZIT:
       return run_impl<point::PointXYZIT>(config);
   }
-  return 1;
+  return BagConverterResultStatus::kError;
 }
 
 static void log_config(const BagConverterConfig & config)
@@ -519,7 +531,8 @@ static void log_config(const BagConverterConfig & config)
 int run(const BagConverterConfig & config)
 {
   log_config(config);
-  return run_single(config);
+  auto ret = run_single(config);
+  return ret == BagConverterResultStatus::kError ? 1 : 0;
 }
 
 static std::vector<fs::path> find_bag_files(const fs::path & input_dir)
@@ -545,11 +558,12 @@ static std::vector<fs::path> find_bag_files(const fs::path & input_dir)
 
 static void print_batch_summary(const BatchResult & result)
 {
-  const size_t total = result.success_count + result.fail_count;
+  const size_t total = result.success_count + result.fail_count + result.skip_count;
   RCLCPP_INFO(g_logger, "========== Batch Summary ==========");
   RCLCPP_INFO(g_logger, "  Total files: %zu", total);
   RCLCPP_INFO(g_logger, "  Success: %zu", result.success_count);
   RCLCPP_INFO(g_logger, "  Failed: %zu", result.fail_count);
+  RCLCPP_INFO(g_logger, "  Skipped: %zu", result.skip_count);
 
   if (!result.failed_files.empty()) {
     RCLCPP_WARN(g_logger, "  Failed files:");
@@ -628,8 +642,11 @@ int run_batch(const BagConverterConfig & config)
     file_config.dst_bag_path = output_path.string();
 
     try {
-      int ret = run_single(file_config);
-      if (ret != 0) {
+      auto ret = run_single(file_config);
+      if (ret == BagConverterResultStatus::kSkipped) {
+        result.skip_count++;
+        result.skipped_files.push_back(relative.string());
+      } else if (ret == BagConverterResultStatus::kError) {
         RCLCPP_ERROR(g_logger, "  Failed to convert: %s", relative.c_str());
         result.fail_count++;
         result.failed_files.push_back(relative.string());
