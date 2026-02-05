@@ -19,7 +19,7 @@ log/
 /src/dependencies/oxts_ros2_driver/
 
 # Private docs
-docs/
+.docs/
 
 # rosbags
 *.mcap
