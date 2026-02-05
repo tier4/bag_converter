@@ -21,9 +21,8 @@ if [ -t 0 ]; then
     DOCKER_FLAGS="-it"
 fi
 
-# Batch mode: mount input/output as directories
-if [ "$1" = "--batch" ] && [ $# -ge 3 ]; then
-    shift # consume --batch
+# Directory mode: mount input/output as directories
+if [ $# -ge 2 ] && [ -d "$1" ]; then
     INPUT_ABS=$(realpath "$1")
     OUTPUT_ABS=$(realpath -m "$2")
     shift 2
@@ -35,7 +34,7 @@ if [ "$1" = "--batch" ] && [ $# -ge 3 ]; then
         -v "$INPUT_ABS":/input:ro \
         -v "$OUTPUT_ABS":/output \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter --batch /input /output "$@"
+        ros2 run bag_converter bag_converter /input /output "$@"
 
 # Single file mode: mount input/output parent directories
 elif [ $# -ge 2 ]; then

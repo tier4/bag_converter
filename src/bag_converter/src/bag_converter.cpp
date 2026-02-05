@@ -76,7 +76,7 @@ void print_usage(const char * program_name)
 {
   std::cout
     << "Usage: " << program_name << " <input_bag> <output_bag> [options]\n"
-    << "       " << program_name << " --batch <input_dir> <output_dir> [options]\n"
+    << "       " << program_name << " <input_dir> <output_dir> [options]\n"
     << "\nUnified bag converter for Seyond LiDAR topics.\n"
     << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
     << "\nSupported input formats:\n"
@@ -89,9 +89,9 @@ void print_usage(const char * program_name)
     << "  the rosbag recording time, and corrects it to match the recording timescale.\n"
     << "  Supported timescales: UTC, TAI (+37s from UTC), GPS (+18s from UTC).\n"
     << "  Use --timescale-correction-ref to specify the rosbag recording timescale.\n"
+    << "\nIf <input> is a directory, all bag files (.mcap, .db3, .sqlite3) in it are\n"
+    << "converted. The directory structure is mirrored in the output directory.\n"
     << "\nOptions:\n"
-    << "  --batch                   Process all bag files in a directory\n"
-    << "  --force                   Overwrite existing output files (batch mode only)\n"
     << "  --keep-original           Keep original packet topics in output bag\n"
     << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
     << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
@@ -121,28 +121,22 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
     }
   }
 
-  // Check for --batch flag (must be the first argument)
-  int positional_start = 1;
-  if (argc >= 2 && std::string(argv[1]) == "--batch") {
-    config.batch_mode = true;
-    positional_start = 2;
-  }
-
-  if (argc < positional_start + 2) {
+  if (argc < 3) {
     print_usage(argv[0]);
     return 1;  // Error: missing arguments
   }
 
-  config.src_bag_path = argv[positional_start];
-  config.dst_bag_path = argv[positional_start + 1];
+  config.src_bag_path = argv[1];
+  config.dst_bag_path = argv[2];
 
-  for (int i = positional_start + 2; i < argc; i++) {
+  // Auto-detect batch mode if input path is a directory
+  if (fs::is_directory(config.src_bag_path)) {
+    config.batch_mode = true;
+  }
+
+  for (int i = 3; i < argc; i++) {
     std::string arg = argv[i];
-    if (arg == "--batch") {
-      config.batch_mode = true;
-    } else if (arg == "--force") {
-      config.force = true;
-    } else if (arg == "--keep-original") {
+    if (arg == "--keep-original") {
       config.keep_original_topics = true;
     } else if (arg == "--min-range" && i + 1 < argc) {
       config.min_range = std::stod(argv[++i]);
@@ -551,12 +545,11 @@ static std::vector<fs::path> find_bag_files(const fs::path & input_dir)
 
 static void print_batch_summary(const BatchResult & result)
 {
-  const size_t total = result.success_count + result.fail_count + result.skip_count;
+  const size_t total = result.success_count + result.fail_count;
   RCLCPP_INFO(g_logger, "========== Batch Summary ==========");
   RCLCPP_INFO(g_logger, "  Total files: %zu", total);
   RCLCPP_INFO(g_logger, "  Success: %zu", result.success_count);
   RCLCPP_INFO(g_logger, "  Failed: %zu", result.fail_count);
-  RCLCPP_INFO(g_logger, "  Skipped: %zu (output already exists)", result.skip_count);
 
   if (!result.failed_files.empty()) {
     RCLCPP_WARN(g_logger, "  Failed files:");
@@ -628,14 +621,6 @@ int run_batch(const BagConverterConfig & config)
     const auto output_path = output_dir / relative;
 
     RCLCPP_INFO(g_logger, "[%zu/%zu] Processing: %s", i + 1, bag_files.size(), relative.c_str());
-
-    // Skip if output already exists (unless --force is set)
-    if (fs::exists(output_path) && !config.force) {
-      RCLCPP_INFO(g_logger, "  Skipping (output already exists): %s", output_path.c_str());
-      result.skip_count++;
-      result.skipped_files.push_back(relative.string());
-      continue;
-    }
 
     // Build per-file config
     BagConverterConfig file_config = config;

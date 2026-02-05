@@ -94,7 +94,6 @@ struct BagConverterConfig
 
   // Batch mode
   bool batch_mode = false;
-  bool force = false;
 };
 
 /**
@@ -153,9 +152,7 @@ struct BatchResult
 {
   size_t success_count = 0;
   size_t fail_count = 0;
-  size_t skip_count = 0;
   std::vector<std::string> failed_files;
-  std::vector<std::string> skipped_files;
 };
 
 /**
