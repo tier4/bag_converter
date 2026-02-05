@@ -71,10 +71,27 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
   }
 
   // Process each packet in the scan
+  size_t filtered_packet_count = 0;
   for (const auto & packet : input.packets) {
-    if (packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS) {
+    if (
+      packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS && !packet.data.empty()) {
+      const auto * pkt = reinterpret_cast<const InnoDataPacket *>(packet.data.data());
+      // Filter by confidence level for Falcon packets if configured
+      if (config_.min_conf_level > 0) {
+        bool is_falcon = (pkt->common.lidar_type == INNO_LIDAR_TYPE_FALCON);
+        if (is_falcon && pkt->confidence_level < static_cast<uint16_t>(config_.min_conf_level)) {
+          ++filtered_packet_count;
+          continue;
+        }
+      }
       process_packet(packet, cloud);
     }
+  }
+  if (filtered_packet_count > 0) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("bag_converter.decoder.seyond"),
+      "Filtered %zu packet(s) with confidence level below %d", filtered_packet_count,
+      config_.min_conf_level);
   }
 
   // Check if point cloud is empty

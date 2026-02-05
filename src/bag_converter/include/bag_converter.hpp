@@ -51,6 +51,7 @@ inline constexpr bool keep_original_topics = false;
 
 // Seyond-specific defaults
 inline constexpr bool use_reflectance = false;
+inline constexpr int min_conf_level = 0;  // 0 = no filtering
 }  // namespace defaults
 
 /**
@@ -94,6 +95,7 @@ struct BagConverterConfig
 
   // Seyond-specific configuration
   bool use_reflectance = defaults::use_reflectance;
+  int min_conf_level = defaults::min_conf_level;
 
   // Output point type
   PointType point_type = PointType::kXYZIT;
