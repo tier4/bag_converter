@@ -28,6 +28,9 @@ if [ "$1" = "--batch" ] && [ $# -ge 3 ]; then
     OUTPUT_ABS=$(realpath -m "$2")
     shift 2
 
+    # Create output directory on host so Docker doesn't create it as root
+    mkdir -p "$OUTPUT_ABS"
+
     docker run $DOCKER_FLAGS --rm \
         -v "$INPUT_ABS":/input:ro \
         -v "$OUTPUT_ABS":/output \
