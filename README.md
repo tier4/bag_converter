@@ -45,15 +45,24 @@ cd docker
 ./bag_converter <input_dir> <output_dir> [options]
 ```
 
-If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in it are automatically converted.
+If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in it are automatically converted. The directory structure is mirrored in the output, and output filenames match the input filenames. All options are applied to every file. If a file fails to convert, the error is logged and processing continues with the remaining files.
 
 ### Options
 
-| Option                | Description                                    |
-| --------------------- | ---------------------------------------------- |
-| `--help`, `-h`        | Show help message                              |
-| `--point-type <type>` | Output point type: `xyzit` (default) or `xyzi` |
-| `--keep-original`     | Keep original packet topics in output bag      |
+| Option                        | Description                                     |
+| ----------------------------- | ----------------------------------------------- |
+| `--help`, `-h`                | Show help message                               |
+| `--point-type <type>`         | Output point type: `xyzit` (default) or `xyzi`  |
+| `--keep-original`             | Keep original packet topics in output bag       |
+| `--base-frame <frame>`        | Transform PointCloud2 to the specified TF frame |
+| `--tf-mode <static\|dynamic>` | TF mode: `static` (default) or `dynamic`        |
+
+The `--base-frame` option transforms all output PointCloud2 messages to the specified coordinate frame using TF data (`tf2_msgs/msg/TFMessage`) from the input bag. The `--tf-mode` option controls how TF data is handled:
+
+- **static** (default): Only the first TF message(s) are read. The same fixed transform is applied to all point clouds. Suitable when the sensor mount does not change.
+- **dynamic**: All TF messages are pre-loaded. Each point cloud is transformed using the time-dependent TF lookup matching its timestamp. Required when the TF tree changes over time.
+
+In both modes, TF data is pre-loaded from the bag before processing begins, so transforms are always available even if TF messages appear after point cloud messages in the bag. The conversion fails if the specified frame is not found or if any point cloud cannot be transformed.
 
 ### Examples
 
@@ -75,9 +84,13 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 
 # Batch mode with options
 ./bag_converter /path/to/input_dir /path/to/output_dir --point-type xyzi
-```
 
-When the input path is a directory, all bag files are converted automatically. The directory structure is mirrored in the output, and output filenames match the input filenames. All options are applied to every file. If a file fails to convert, the error is logged and processing continues with the remaining files.
+# Transform point clouds to base_link frame (static TF, default)
+./bag_converter input.mcap output.mcap --base-frame base_link
+
+# Transform with dynamic (time-dependent) TF
+./bag_converter input.mcap output.mcap --base-frame base_link --tf-mode dynamic
+```
 
 ## Message Types
 

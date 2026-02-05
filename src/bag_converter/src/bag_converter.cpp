@@ -9,6 +9,8 @@
 
 #include "bag_converter.hpp"
 
+#include "tf_transformer.hpp"
+
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
@@ -98,6 +100,14 @@ void print_usage(const char * program_name)
     << "  --point-type <type>       Output point type: xyzit or xyzi (default: xyzit)\n"
     << "  --timescale-correction <on|off>  Enable/disable timescale correction (default: on)\n"
     << "  --timescale-correction-ref <utc|tai|gps>  Rosbag recording timescale (default: utc)\n"
+    << "  --base-frame <frame>      Transform PointCloud2 to specified TF frame\n"
+    << "                            (requires tf2_msgs/msg/TFMessage topics in the bag)\n"
+    << "  --tf-mode <static|dynamic>  TF mode (default: static)\n"
+    << "                            static:  uses first TF message(s), fixed transform\n"
+    << "                            dynamic: pre-loads all TF, time-dependent lookup\n"
+    << "                            In both modes, TF data is pre-loaded before processing,\n"
+    << "                            so transforms are available even if TF messages appear\n"
+    << "                            after point cloud messages in the bag.\n"
     << "  -h, --help                Show this help message\n"
     << "  -v, --version             Show version information\n";
 }
@@ -171,6 +181,19 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       } else {
         std::cerr << "Error: Invalid value for --timescale-correction-ref '" << value
                   << "'. Must be 'utc', 'tai', or 'gps'.\n";
+        return 1;
+      }
+    } else if (arg == "--base-frame" && i + 1 < argc) {
+      config.frame = argv[++i];
+    } else if (arg == "--tf-mode" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "static") {
+        config.tf_mode = BagConverterTfMode::kStatic;
+      } else if (value == "dynamic") {
+        config.tf_mode = BagConverterTfMode::kDynamic;
+      } else {
+        std::cerr << "Error: Invalid value for --tf-mode '" << value
+                  << "'. Must be 'static' or 'dynamic'.\n";
         return 1;
       }
     } else {
@@ -329,14 +352,28 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
 
   const auto bag_metadata = reader.get_metadata();
 
+  // Create TF transformer if frame is specified
+  std::unique_ptr<tf_transformer::TfTransformer> transformer;
+  if (!config.frame.empty()) {
+    transformer = std::make_unique<tf_transformer::TfTransformer>(config.tf_mode);
+  }
+
   // Build topic type map from metadata and check for decodable topics
   std::map<std::string, std::string> topic_types;
   bool has_decodable_topics = false;
+  bool has_tf_topic = false;
+  bool has_tf_messages = false;
   for (const auto & topic_info : bag_metadata.topics_with_message_count) {
     topic_types[topic_info.topic_metadata.name] = topic_info.topic_metadata.type;
     const auto & type = topic_info.topic_metadata.type;
     if (type == "nebula_msgs/msg/NebulaPackets" || type == "seyond/msg/SeyondScan") {
       has_decodable_topics = true;
+    }
+    if (type == "tf2_msgs/msg/TFMessage") {
+      has_tf_topic = true;
+      if (topic_info.message_count > 0) {
+        has_tf_messages = true;
+      }
     }
   }
 
@@ -345,6 +382,19 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       g_logger, "Skipping conversion: no decodable topics found in %s",
       config.src_bag_path.c_str());
     return BagConverterResultStatus::kSkipped;
+  }
+
+  if (transformer && !has_tf_topic) {
+    RCLCPP_ERROR(
+      g_logger, "No TF topics found in %s. Cannot transform to frame '%s'",
+      config.src_bag_path.c_str(), config.frame.c_str());
+    return BagConverterResultStatus::kError;
+  }
+
+  if (transformer && !has_tf_messages) {
+    RCLCPP_ERROR(
+      g_logger, "TF topics exist but contain no messages in %s", config.src_bag_path.c_str());
+    return BagConverterResultStatus::kError;
   }
 
   // Open output bag (write to temp directory)
@@ -395,6 +445,30 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       writer.create_topic(topic_metadata);
       created_topics.insert(topic_metadata.name);
     }
+  }
+
+  // Pre-load TF data
+  if (transformer) {
+    const char * tf_mode_str = config.tf_mode == BagConverterTfMode::kStatic ? "static" : "dynamic";
+    RCLCPP_INFO(g_logger, "Loading TF data (%s mode)...", tf_mode_str);
+    rosbag2_cpp::Reader tf_reader;
+    tf_reader.open(storage_options_in);
+    while (tf_reader.has_next()) {
+      auto msg = tf_reader.read_next();
+      auto it = topic_types.find(msg->topic_name);
+      if (it != topic_types.end() && it->second == "tf2_msgs/msg/TFMessage") {
+        rclcpp::SerializedMessage serialized_tf(*msg->serialized_data);
+        transformer->add_transforms(serialized_tf, msg->topic_name);
+        if (config.tf_mode == BagConverterTfMode::kStatic && transformer->has_frame(config.frame)) {
+          break;
+        }
+      }
+    }
+    if (!transformer->has_frame(config.frame)) {
+      RCLCPP_ERROR(g_logger, "Frame '%s' does not exist in TF data", config.frame.c_str());
+      return BagConverterResultStatus::kError;
+    }
+    RCLCPP_INFO(g_logger, "TF data loaded");
   }
 
   // Serializer for output PointCloud2
@@ -475,6 +549,14 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
         }
       }
 
+      if (transformer) {
+        if (!transformer->transform(*pointcloud_msg, config.frame)) {
+          RCLCPP_ERROR(
+            g_logger, "TF transform failed for frame: %s", pointcloud_msg->header.frame_id.c_str());
+          return BagConverterResultStatus::kError;
+        }
+      }
+
       auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
       pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
 
@@ -526,6 +608,12 @@ static void log_config(const BagConverterConfig & config)
   RCLCPP_INFO(g_logger, "  Keep original topics: %s", config.keep_original_topics ? "yes" : "no");
   RCLCPP_INFO(g_logger, "  Timescale correction: %s", config.timescale_correction ? "on" : "off");
   RCLCPP_INFO(g_logger, "  Timescale correction ref: %s", config.timescale_correction_ref.c_str());
+  if (!config.frame.empty()) {
+    RCLCPP_INFO(g_logger, "  TF frame: %s", config.frame.c_str());
+    RCLCPP_INFO(
+      g_logger, "  TF mode: %s",
+      config.tf_mode == BagConverterTfMode::kStatic ? "static" : "dynamic");
+  }
 }
 
 int run(const BagConverterConfig & config)
@@ -568,6 +656,13 @@ static void print_batch_summary(const BatchResult & result)
   if (!result.failed_files.empty()) {
     RCLCPP_WARN(g_logger, "  Failed files:");
     for (const auto & f : result.failed_files) {
+      RCLCPP_WARN(g_logger, "    - %s", f.c_str());
+    }
+  }
+
+  if (!result.skipped_files.empty()) {
+    RCLCPP_WARN(g_logger, "  Skipped files:");
+    for (const auto & f : result.skipped_files) {
       RCLCPP_WARN(g_logger, "    - %s", f.c_str());
     }
   }

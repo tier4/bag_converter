@@ -64,6 +64,11 @@ enum class BagConverterResultStatus { kSuccess = 0, kError = 1, kSkipped = 2 };
 enum class DriverType { kNebula, kSeyond };
 
 /**
+ * @brief TF transform mode
+ */
+enum class BagConverterTfMode { kStatic, kDynamic };
+
+/**
  * @brief Statistics for bag conversion per topic
  */
 struct BagConverterStats
@@ -96,6 +101,10 @@ struct BagConverterConfig
   // Timescale correction
   bool timescale_correction = true;
   std::string timescale_correction_ref = "utc";
+
+  // TF2 coordinate transformation
+  std::string frame;
+  BagConverterTfMode tf_mode = BagConverterTfMode::kStatic;
 
   // Batch mode
   bool batch_mode = false;
