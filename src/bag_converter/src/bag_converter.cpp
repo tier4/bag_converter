@@ -541,8 +541,8 @@ static std::vector<fs::path> find_bag_files(const fs::path & input_dir)
     }
   } catch (const fs::filesystem_error & e) {
     RCLCPP_WARN(
-      g_logger, "Error while traversing input directory '%s': %s",
-      input_dir.string().c_str(), e.what());
+      g_logger, "Error while traversing input directory '%s': %s", input_dir.string().c_str(),
+      e.what());
   }
 
   std::sort(files.begin(), files.end());
