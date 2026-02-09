@@ -216,8 +216,10 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
       if constexpr (std::is_same<PointType, const InnoXyzPoint *>::value) {
         point.refl_type = static_cast<int8_t>(point_ptr->type);
+        point.elongation = static_cast<int16_t>(point_ptr->elongation);
       } else {
-        point.refl_type = -1;  // InnoEnXyzPoint has no type field
+        point.refl_type = -1;   // InnoEnXyzPoint has no type field
+        point.elongation = -1;  // InnoEnXyzPoint has no elongation field
       }
     }
 

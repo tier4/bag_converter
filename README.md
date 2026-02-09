@@ -126,7 +126,8 @@ The output bag file contains `sensor_msgs::msg::PointCloud2` messages on topics 
 
 **Extended fields** (experimental; subject to change). Supported for **SeyondScan** input only.
 
-- `refl_type` (int8): Point classification (en_xyzit only). **Values:** 0 = normal, 1 = ground, 2 = fog; **-1** = not available (e.g. Seyond formats that do not include this field such as Robin W/Elite XYZ).
+- `refl_type` (int8): Point classification (en_xyzit only). **Values:** 0 = normal, 1 = ground, 2 = fog; **-1** = not available.
+- `elongation` (int16): Raw elongation value (en_xyzit only). **Values:** 0–15 when available; **-1** = not available.
 
 #### Timestamps
 

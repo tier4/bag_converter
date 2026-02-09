@@ -101,7 +101,8 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
     pc2_pt.z = pt.z;
     pc2_pt.intensity = pt.intensity;
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
-      pc2_pt.refl_type = -1;  // Invalid: NebulaPackets does not provide point classification
+      pc2_pt.refl_type = -1;   // Not available: NebulaPackets does not provide point classification
+      pc2_pt.elongation = -1;  // Not available: NebulaPoint has no elongation
     }
     if constexpr (
       std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||
