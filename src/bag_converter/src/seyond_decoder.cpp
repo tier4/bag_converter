@@ -207,10 +207,12 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
     // point_ptr->ts_10us is relative to the packet's ts_start_us (in 10us units)
     // pkt_offset_us_ is the packet's offset from scan start (in us)
     // point.t_us = pkt_offset_us_ + (ts_10us * 10) = time from scan start in us
+    // point.timestamp = t_us * 1000 = time from scan start in ns
     if constexpr (
       std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||
       std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
       point.t_us = static_cast<uint32_t>(pkt_offset_us_ + point_ptr->ts_10us * 10);
+      point.timestamp = point.t_us * 1000;
     }
     // refl_type: point classification (0: normal, 1: ground, 2: fog); -1 when not available
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {

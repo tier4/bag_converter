@@ -109,6 +109,8 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
       std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
       // Convert from nanoseconds to microseconds
       pc2_pt.t_us = pt.time_stamp / 1000;
+      // timestamp is in nanoseconds (same as pt.time_stamp)
+      pc2_pt.timestamp = pt.time_stamp;
     }
     pc2_cloud.push_back(pc2_pt);
   }
