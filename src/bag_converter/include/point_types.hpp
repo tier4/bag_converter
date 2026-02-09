@@ -65,6 +65,7 @@ struct EIGEN_ALIGN16 PointXYZIT
  * - intensity (float)
  * - t_us: relative timestamp from scan start in microseconds (uint32_t)
  * - refl_type: point classification (0: normal, 1: ground, 2: fog; -1: not available; int8_t)
+ * - elongation: raw elongation value 0-15 when available; -1: not available (int16_t)
  */
 struct EIGEN_ALIGN16 PointEnXYZIT
 {
@@ -72,6 +73,7 @@ struct EIGEN_ALIGN16 PointEnXYZIT
   float intensity;
   uint32_t t_us;
   int8_t refl_type;
+  int16_t elongation;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -107,6 +109,6 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointEnXYZIT,
   (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
-    int8_t, refl_type, refl_type))
+    int8_t, refl_type, refl_type)(int16_t, elongation, elongation))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP
