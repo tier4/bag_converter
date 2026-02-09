@@ -52,7 +52,7 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 | Option                        | Description                                                                                                                       |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `--help`, `-h`                | Show help message                                                                                                                 |
-| `--point-type <type>`         | Output point type: `xyzit` (default) or `xyzi`                                                                                    |
+| `--point-type <type>`         | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit` (en_xyzit includes refl_type)                                         |
 | `--keep-original`             | Keep original packet topics in output bag                                                                                         |
 | `--base-frame <frame>`        | Transform PointCloud2 to the specified TF frame                                                                                   |
 | `--tf-mode <static\|dynamic>` | TF mode: `static` (default) or `dynamic`                                                                                          |
@@ -104,11 +104,11 @@ The tool supports two input message types:
 
 #### NebulaPackets
 
-The input bag file contains `nebula_msgs::msg::NebulaPackets` messages on topics ending with `/nebula_packets`. These messages contain raw packet data from Nebula LiDAR sensors.
+The input bag file contains `nebula_msgs::msg::NebulaPackets` messages on topics ending with `/nebula_packets`. This format is used when recording with the **Nebula** universal lidar driver (using its Seyond driver for Seyond LiDAR sensors). The messages contain raw packet data.
 
 #### SeyondScan
 
-The input bag file contains `seyond::msg::SeyondScan` messages on topics ending with `/seyond_packets`. These messages contain scan data from Seyond LiDAR sensors.
+The input bag file contains `seyond::msg::SeyondScan` messages on topics ending with `/seyond_packets`. This format is used when recording with the **official Seyond SDK**. The messages contain scan data from Seyond LiDAR sensors.
 
 ### Output: PointCloud2
 
@@ -116,13 +116,17 @@ The output bag file contains `sensor_msgs::msg::PointCloud2` messages on topics 
 
 #### Fields
 
-The PointCloud2 messages contain the following fields:
+**Normal fields** (present for point types xyzit, xyzi, en_xyzit):
 
 - `x` (float32): X coordinate in meters
 - `y` (float32): Y coordinate in meters
 - `z` (float32): Z coordinate in meters
 - `intensity` (float32): Intensity value
-- `t_us` (uint32): Relative timestamp in microseconds from the scan start time
+- `t_us` (uint32): Relative timestamp in microseconds from the scan start time (xyzit point type only)
+
+**Extended fields** (experimental; subject to change). Supported for **SeyondScan** input only.
+
+- `refl_type` (int8): Point classification (en_xyzit only). **Values:** 0 = normal, 1 = ground, 2 = fog; **-1** = not available (e.g. Seyond formats that do not include this field such as Robin W/Elite XYZ).
 
 #### Timestamps
 

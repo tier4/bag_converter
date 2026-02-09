@@ -17,7 +17,7 @@ namespace bag_converter
 /**
  * @brief Output point type for point cloud conversion
  */
-enum class PointType { kXYZIT, kXYZI };
+enum class PointType { kXYZIT, kXYZI, kEnXYZIT };
 
 }  // namespace bag_converter
 
@@ -57,6 +57,25 @@ struct EIGEN_ALIGN16 PointXYZIT
 };
 
 /**
+ * @brief Extended point type: XYZ + intensity + timestamp + refl_type (packet type)
+ *
+ * Extended version of PointXYZIT with refl_type from the sensor packet.
+ * It includes:
+ * - x, y, z coordinates (float)
+ * - intensity (float)
+ * - t_us: relative timestamp from scan start in microseconds (uint32_t)
+ * - refl_type: point classification (0: normal, 1: ground, 2: fog; -1: not available; int8_t)
+ */
+struct EIGEN_ALIGN16 PointEnXYZIT
+{
+  PCL_ADD_POINT4D;
+  float intensity;
+  uint32_t t_us;
+  int8_t refl_type;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
+/**
  * @brief Convert PointType enum to string representation
  * @param point_type The point type enum value
  * @return String representation of the point type
@@ -68,6 +87,8 @@ inline const char * point_type_to_string(bag_converter::PointType point_type)
       return "xyzit";
     case bag_converter::PointType::kXYZI:
       return "xyzi";
+    case bag_converter::PointType::kEnXYZIT:
+      return "en_xyzit";
   }
   return "unknown";
 }
@@ -82,5 +103,10 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointXYZIT,
   (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us))
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(
+  bag_converter::point::PointEnXYZIT,
+  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
+    int8_t, refl_type, refl_type))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP
