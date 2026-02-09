@@ -6,7 +6,7 @@ repositories:
   dependencies/seyond_sdk:
     type: git
     url: https://github.com/Seyond-Inc/inno-lidar-sdk.git
-    version: e7e40ca635605447dbf8d73735706aee56b13f70 # main
+    version: 622223c6f9ec7e32326aa6a2d83f83cb6a84dfcb # 3.103.4
   dependencies/oxts_ros2_driver:
     type: git
     url: https://github.com/tier4/oxts_ros2_driver.git
