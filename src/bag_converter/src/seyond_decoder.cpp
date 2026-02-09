@@ -130,8 +130,14 @@ void SeyondPCDDecoder<OutputPointT>::convert_and_parse(
   const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud)
 {
   if (CHECK_SPHERE_POINTCLOUD_DATA(pkt->type)) {
-    // Convert sphere coordinate to xyz coordinate
-    if (anglehv_table_init_) {
+    // Compact (Robin W / Robin Elite) requires AngleHV table; non-Compact sphere does not
+    if (CHECK_CO_SPHERE_POINTCLOUD_DATA(pkt->type)) {
+      if (!anglehv_table_init_) {
+        RCLCPP_ERROR(
+          rclcpp::get_logger("bag_converter.decoder.seyond"),
+          "Compact pointcloud (type %d) requires AngleHV table; skipping packet", pkt->type);
+        return;
+      }
       inno_lidar_convert_to_xyz_pointcloud2(
         pkt, reinterpret_cast<InnoDataPacket *>(&data_buffer_[0]), data_buffer_.size(), false,
         reinterpret_cast<InnoDataPacket *>(anglehv_table_.data()));
