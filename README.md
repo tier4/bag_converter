@@ -144,6 +144,12 @@ The absolute timestamp for each point (in nanoseconds, UTC) can be calculated as
 absolute_timestamp_ns = (header.stamp.sec * 1,000,000,000 + header.stamp.nanosec) + timestamp
 ```
 
+Or, using the deprecated `t_us` field:
+
+```text
+absolute_timestamp_ns = (header.stamp.sec * 1,000,000,000 + header.stamp.nanosec) + (t_us * 1,000)
+```
+
 ## Parsing PointCloud2 Messages
 
 The repository includes a Python script `scripts/decode_pointcloud2.py` that demonstrates how to parse PointCloud2 messages from rosbag2 files.
