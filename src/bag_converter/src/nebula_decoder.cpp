@@ -100,7 +100,12 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
     pc2_pt.y = pt.y;
     pc2_pt.z = pt.z;
     pc2_pt.intensity = pt.intensity;
-    if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT>) {
+    if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
+      pc2_pt.refl_type = -1;  // Invalid: NebulaPackets does not provide point classification
+    }
+    if constexpr (
+      std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||
+      std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
       // Convert from nanoseconds to microseconds
       pc2_pt.t_us = pt.time_stamp / 1000;
     }
@@ -210,5 +215,6 @@ void NebulaPCDDecoder<OutputPointT>::set_config(const NebulaPCDDecoderConfig & c
 // Explicit template instantiations
 template class NebulaPCDDecoder<bag_converter::point::PointXYZIT>;
 template class NebulaPCDDecoder<bag_converter::point::PointXYZI>;
+template class NebulaPCDDecoder<bag_converter::point::PointEnXYZIT>;
 
 }  // namespace bag_converter::decoder::nebula

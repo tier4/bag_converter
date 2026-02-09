@@ -97,7 +97,7 @@ void print_usage(const char * program_name)
     << "  --keep-original           Keep original packet topics in output bag\n"
     << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
     << "  --max-range <value>       Maximum range in meters (default: 200.0)\n"
-    << "  --point-type <type>       Output point type: xyzit or xyzi (default: xyzit)\n"
+    << "  --point-type <type>       Output point type: xyzit, xyzi, or en_xyzit (default: xyzit)\n"
     << "  --timescale-correction <on|off>  Enable/disable timescale correction (default: on)\n"
     << "  --timescale-correction-ref <utc|tai|gps>  Rosbag recording timescale (default: utc)\n"
     << "  --base-frame <frame>      Transform PointCloud2 to specified TF frame\n"
@@ -160,9 +160,11 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
         config.point_type = PointType::kXYZIT;
       } else if (point_type_str == "xyzi") {
         config.point_type = PointType::kXYZI;
+      } else if (point_type_str == "en_xyzit") {
+        config.point_type = PointType::kEnXYZIT;
       } else {
         std::cerr << "Error: Invalid point type '" << point_type_str
-                  << "'. Must be 'xyzit' or 'xyzi'.\n";
+                  << "'. Must be 'xyzit', 'xyzi', or 'en_xyzit'.\n";
         return 1;
       }
     } else if (arg == "--timescale-correction" && i + 1 < argc) {
@@ -605,6 +607,8 @@ static BagConverterResultStatus run_single(const BagConverterConfig & config)
       return run_impl<point::PointXYZI>(config);
     case PointType::kXYZIT:
       return run_impl<point::PointXYZIT>(config);
+    case PointType::kEnXYZIT:
+      return run_impl<point::PointEnXYZIT>(config);
   }
   return BagConverterResultStatus::kError;
 }

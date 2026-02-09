@@ -207,8 +207,18 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
     // point_ptr->ts_10us is relative to the packet's ts_start_us (in 10us units)
     // pkt_offset_us_ is the packet's offset from scan start (in us)
     // point.t_us = pkt_offset_us_ + (ts_10us * 10) = time from scan start in us
-    if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT>) {
+    if constexpr (
+      std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||
+      std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
       point.t_us = static_cast<uint32_t>(pkt_offset_us_ + point_ptr->ts_10us * 10);
+    }
+    // refl_type: point classification (0: normal, 1: ground, 2: fog); -1 when not available
+    if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
+      if constexpr (std::is_same<PointType, const InnoXyzPoint *>::value) {
+        point.refl_type = static_cast<int8_t>(point_ptr->type);
+      } else {
+        point.refl_type = -1;  // InnoEnXyzPoint has no type field
+      }
     }
 
     // Apply coordinate transformation (Autoware coordinate system)
@@ -264,6 +274,7 @@ void SeyondPCDDecoder<OutputPointT>::clear_angle_hv_table()
 // Explicit template instantiations
 template class SeyondPCDDecoder<bag_converter::point::PointXYZIT>;
 template class SeyondPCDDecoder<bag_converter::point::PointXYZI>;
+template class SeyondPCDDecoder<bag_converter::point::PointEnXYZIT>;
 
 // Explicit template instantiations for point_xyz_data_parse
 template void
@@ -278,5 +289,11 @@ SeyondPCDDecoder<bag_converter::point::PointXYZI>::point_xyz_data_parse<const In
 template void
 SeyondPCDDecoder<bag_converter::point::PointXYZI>::point_xyz_data_parse<const InnoXyzPoint *>(
   bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZI> &);
+template void
+SeyondPCDDecoder<bag_converter::point::PointEnXYZIT>::point_xyz_data_parse<const InnoEnXyzPoint *>(
+  bool, uint32_t, const InnoEnXyzPoint *, pcl::PointCloud<bag_converter::point::PointEnXYZIT> &);
+template void
+SeyondPCDDecoder<bag_converter::point::PointEnXYZIT>::point_xyz_data_parse<const InnoXyzPoint *>(
+  bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointEnXYZIT> &);
 
 }  // namespace bag_converter::decoder::seyond
