@@ -149,6 +149,10 @@ private:
   double scan_start_us_;  // Scan start time in microseconds (epoch time)
   double pkt_offset_us_;  // Current packet's offset from scan start in microseconds
 
+  // Per-packet LiDAR state (from InnoCommonHeader)
+  uint8_t pkt_lidar_mode_;    // enum InnoLidarMode
+  uint8_t pkt_lidar_status_;  // enum InnoLidarStatus
+
   static constexpr double us_in_second_c = 1000000.0;
   static constexpr double ten_us_in_second_c = 100000.0;
 };
