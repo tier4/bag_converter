@@ -103,8 +103,6 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
       pc2_pt.refl_type = -1;   // Not available: NebulaPackets does not provide point classification
       pc2_pt.elongation = -1;  // Not available: NebulaPoint has no elongation
-      pc2_pt.lidar_status = -1;  // Not available: NebulaPackets does not provide lidar status
-      pc2_pt.lidar_mode = -1;    // Not available: NebulaPackets does not provide lidar mode
     }
     if constexpr (
       std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||

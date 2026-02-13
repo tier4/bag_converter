@@ -163,10 +163,6 @@ void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
   // Calculate the packet's time offset from scan start (in microseconds)
   pkt_offset_us_ = pkt->common.ts_start_us - scan_start_us_;
 
-  // Store per-packet LiDAR state for use in point_xyz_data_parse
-  pkt_lidar_mode_ = pkt->common.lidar_mode;
-  pkt_lidar_status_ = pkt->common.lidar_status;
-
   // Parse point data based on packet type (different lidars use different structures)
   if (CHECK_EN_XYZ_POINTCLOUD_DATA(pkt->type)) {
     const InnoEnXyzPoint * pt = reinterpret_cast<const InnoEnXyzPoint *>(
@@ -227,8 +223,6 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
         point.refl_type = -1;   // InnoEnXyzPoint has no type field
         point.elongation = -1;  // InnoEnXyzPoint has no elongation field
       }
-      point.lidar_status = static_cast<int8_t>(pkt_lidar_status_);
-      point.lidar_mode = static_cast<int8_t>(pkt_lidar_mode_);
     }
 
     // Apply coordinate transformation (Autoware coordinate system)

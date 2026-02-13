@@ -129,8 +129,6 @@ The output bag file contains `sensor_msgs::msg::PointCloud2` messages on topics 
 
 - `refl_type` (int8): Point classification (en_xyzit only). **Values:** 0 = normal, 1 = ground, 2 = fog; **-1** = not available.
 - `elongation` (int16): Raw elongation value (en_xyzit only). **Values:** 0–15 when available; **-1** = not available.
-- `lidar_status` (int8): LiDAR operating status (en_xyzit only). **Values:** 0 = none, 1 = transition, 2 = normal, 3 = failed; **-1** = not available.
-- `lidar_mode` (int8): LiDAR operating mode (en_xyzit only). **Values:** 1 = sleep, 2 = standby, 3 = work_normal, 6 = protection; **-1** = not available.
 
 #### Timestamps
 
