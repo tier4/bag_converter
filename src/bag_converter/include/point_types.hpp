@@ -71,6 +71,8 @@ struct EIGEN_ALIGN16 PointXYZIT
  * - timestamp: relative timestamp from scan start in nanoseconds (uint32_t)
  * - refl_type: point classification (0: normal, 1: ground, 2: fog; -1: not available; int8_t)
  * - elongation: raw elongation value 0-15 when available; -1: not available (int16_t)
+ * - lidar_status: LiDAR status (0: none, 1: transition, 2: normal, 3: failed; -1: not available)
+ * - lidar_mode: LiDAR mode (1: sleep, 2: standby, 3: work_normal, 6: protection; -1: not available)
  */
 struct EIGEN_ALIGN16 PointEnXYZIT
 {
@@ -80,6 +82,8 @@ struct EIGEN_ALIGN16 PointEnXYZIT
   uint32_t timestamp;
   int8_t refl_type;
   int16_t elongation;
+  int8_t lidar_status;
+  int8_t lidar_mode;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -116,6 +120,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointEnXYZIT,
   (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
-    uint32_t, timestamp, timestamp)(int8_t, refl_type, refl_type)(int16_t, elongation, elongation))
+    uint32_t, timestamp, timestamp)(int8_t, refl_type, refl_type)(int16_t, elongation, elongation)(
+    int8_t, lidar_status, lidar_status)(int8_t, lidar_mode, lidar_mode))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP
