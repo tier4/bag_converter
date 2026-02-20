@@ -115,6 +115,9 @@ struct BagConverterConfig
   // Log time override
   bool use_header_stamp_as_log_time = false;
 
+  // Passthrough mode (process all messages even without decodable topics)
+  bool passthrough = false;
+
   // Batch mode
   bool batch_mode = false;
 };

@@ -148,6 +148,9 @@ void print_usage(const char * program_name)
     << "  --use-header-stamp-as-log-time\n"
     << "                            Override mcap log_time with header.stamp for all\n"
     << "                            messages that contain a std_msgs/msg/Header\n"
+    << "  --passthrough             Process all messages even without decodable topics.\n"
+    << "                            Useful with --use-header-stamp-as-log-time to rewrite\n"
+    << "                            log_time for bags without LiDAR packet topics.\n"
     << "  -h, --help                Show this help message\n"
     << "  -v, --version             Show version information\n";
 }
@@ -247,6 +250,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       }
     } else if (arg == "--use-header-stamp-as-log-time") {
       config.use_header_stamp_as_log_time = true;
+    } else if (arg == "--passthrough") {
+      config.passthrough = true;
     } else {
       std::cerr << "Error: Unknown option '" << arg << "'.\n";
       print_usage(argv[0]);
@@ -429,11 +434,16 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     }
   }
 
-  if (!has_decodable_topics) {
+  if (!has_decodable_topics && !config.passthrough) {
     RCLCPP_WARN(
       g_logger, "Skipping conversion: no decodable topics found in %s",
       config.src_bag_path.c_str());
     return BagConverterResultStatus::kSkipped;
+  }
+
+  if (!has_decodable_topics && config.passthrough) {
+    RCLCPP_INFO(
+      g_logger, "Passthrough mode: no decodable topics, all messages will be passed through");
   }
 
   if (transformer && !has_tf_topic) {

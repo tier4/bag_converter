@@ -58,6 +58,7 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 | `--tf-mode <static\|dynamic>`    | TF mode: `static` (default) or `dynamic`                                                                                                                                                        |
 | `--min-conf-level <0-3>`         | **[Experimental]** Minimum packet confidence level (default: `0`, no filtering). Only effective for SeyondScan with Falcon LiDAR.                                                               |
 | `--use-header-stamp-as-log-time` | Override mcap log_time with `header.stamp` for all messages that contain a `std_msgs/msg/Header`. Messages without a valid header (e.g. `tf2_msgs/msg/TFMessage`) keep their original log_time. |
+| `--passthrough`                  | Process all messages even without decodable LiDAR packet topics. Useful with `--use-header-stamp-as-log-time` to rewrite log_time for bags that do not contain LiDAR packet topics.             |
 
 The `--base-frame` option transforms all output PointCloud2 messages to the specified coordinate frame using TF data (`tf2_msgs/msg/TFMessage`) from the input bag. The `--tf-mode` option controls how TF data is handled:
 
