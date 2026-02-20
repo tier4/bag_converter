@@ -52,6 +52,11 @@ inline constexpr bool keep_original_topics = false;
 // Seyond-specific defaults
 inline constexpr bool use_reflectance = false;
 inline constexpr int min_conf_level = 0;  // 0 = no filtering
+
+// CDR header stamp extraction
+inline constexpr size_t cdr_header_min_size = 4 + 4 + 4;           // CDR header + sec + nanosec
+inline constexpr int32_t cdr_stamp_min_epoch_sec = 1'000'000'000;  // ~2001-09-09
+inline constexpr uint32_t cdr_stamp_max_nanosec = 1'000'000'000;
 }  // namespace defaults
 
 /**
