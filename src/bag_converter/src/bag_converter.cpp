@@ -52,8 +52,7 @@ std::optional<rclcpp::Time> extract_header_stamp_from_cdr(
   // Sanity check: skip messages where the extracted bytes are not a valid epoch timestamp
   // (e.g. tf2_msgs/msg/TFMessage where offset 4-7 is an array length, not stamp.sec)
   constexpr int32_t kMinEpochSec = 1'000'000'000;  // ~2001-09-09
-  constexpr int32_t kMaxEpochSec = 2'000'000'000;  // ~2033-05-18
-  if (sec < kMinEpochSec || sec > kMaxEpochSec || nanosec >= 1'000'000'000) {
+  if (sec < kMinEpochSec || nanosec >= 1'000'000'000) {
     return std::nullopt;
   }
 
