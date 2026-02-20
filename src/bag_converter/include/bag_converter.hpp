@@ -52,6 +52,10 @@ inline constexpr bool keep_original_topics = false;
 // Seyond-specific defaults
 inline constexpr bool use_reflectance = false;
 inline constexpr int min_conf_level = 0;  // 0 = no filtering
+
+// CDR header stamp extraction
+inline constexpr size_t cdr_header_min_size = 4 + 4 + 4;  // CDR header + sec + nanosec
+inline constexpr int64_t cdr_stamp_min_epoch_ns = 1'000'000'000LL * 1'000'000'000LL;  // ~2001-09-09
 }  // namespace defaults
 
 /**
@@ -107,6 +111,9 @@ struct BagConverterConfig
   // TF2 coordinate transformation
   std::string frame;
   BagConverterTfMode tf_mode = BagConverterTfMode::kStatic;
+
+  // Log time override
+  bool use_header_stamp_as_log_time = false;
 
   // Batch mode
   bool batch_mode = false;
