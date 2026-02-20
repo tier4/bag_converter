@@ -50,7 +50,9 @@ std::optional<rclcpp::Time> extract_header_stamp_from_cdr(
 
   // Sanity check: skip messages where the extracted bytes are not a valid epoch timestamp
   // (e.g. tf2_msgs/msg/TFMessage where offset 4-7 is an array length, not stamp.sec)
-  if (sec < defaults::cdr_stamp_min_epoch_sec || nanosec >= 1'000'000'000) {
+  const int64_t stamp_ns =
+    static_cast<int64_t>(sec) * 1'000'000'000 + static_cast<int64_t>(nanosec);
+  if (stamp_ns < defaults::cdr_stamp_min_epoch_ns) {
     return std::nullopt;
   }
 

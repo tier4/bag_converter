@@ -54,8 +54,8 @@ inline constexpr bool use_reflectance = false;
 inline constexpr int min_conf_level = 0;  // 0 = no filtering
 
 // CDR header stamp extraction
-inline constexpr size_t cdr_header_min_size = 4 + 4 + 4;           // CDR header + sec + nanosec
-inline constexpr int32_t cdr_stamp_min_epoch_sec = 1'000'000'000;  // ~2001-09-09
+inline constexpr size_t cdr_header_min_size = 4 + 4 + 4;  // CDR header + sec + nanosec
+inline constexpr int64_t cdr_stamp_min_epoch_ns = 1'000'000'000LL * 1'000'000'000LL;  // ~2001-09-09
 }  // namespace defaults
 
 /**
