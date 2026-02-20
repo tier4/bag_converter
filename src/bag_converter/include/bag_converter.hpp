@@ -108,6 +108,9 @@ struct BagConverterConfig
   std::string frame;
   BagConverterTfMode tf_mode = BagConverterTfMode::kStatic;
 
+  // Log time override
+  bool use_header_stamp_as_log_time = false;
+
   // Batch mode
   bool batch_mode = false;
 };

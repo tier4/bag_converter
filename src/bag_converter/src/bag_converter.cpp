@@ -12,6 +12,7 @@
 #include "tf_transformer.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <set>
@@ -23,6 +24,33 @@ static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 
 namespace bag_converter
 {
+
+/**
+ * @brief Extract header.stamp from CDR-serialized ROS 2 message
+ *
+ * For message types with std_msgs/msg/Header as the first field,
+ * the stamp (sec + nanosec) is located at bytes 4-11 after the 4-byte CDR header.
+ *
+ * @param serialized_data The CDR-serialized message data
+ * @return The extracted timestamp, or std::nullopt if data is too small
+ */
+std::optional<rclcpp::Time> extract_header_stamp_from_cdr(
+  const rcutils_uint8_array_t & serialized_data)
+{
+  // CDR layout: [4-byte encapsulation header][stamp.sec (int32)][stamp.nanosec (uint32)]...
+  constexpr size_t kMinSize = 4 + 4 + 4;  // CDR header + sec + nanosec
+  if (serialized_data.buffer_length < kMinSize) {
+    return std::nullopt;
+  }
+
+  const uint8_t * buf = serialized_data.buffer;
+  int32_t sec;
+  uint32_t nanosec;
+  std::memcpy(&sec, buf + 4, sizeof(sec));
+  std::memcpy(&nanosec, buf + 8, sizeof(nanosec));
+
+  return rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
+}
 
 std::pair<std::string, std::string> extract_sensor_info(
   const std::string & topic_name, const std::string & suffix, const std::string & default_frame_id)
@@ -110,6 +138,9 @@ void print_usage(const char * program_name)
     << "                            after point cloud messages in the bag.\n"
     << "  --min-conf-level <0-3>    [Experimental] Min packet confidence (Falcon only)\n"
     << "                            (default: 0, no filtering). Filters at packet level.\n"
+    << "  --use-header-stamp-as-log-time\n"
+    << "                            Override mcap log_time with header.stamp for all\n"
+    << "                            messages that contain a std_msgs/msg/Header\n"
     << "  -h, --help                Show this help message\n"
     << "  -v, --version             Show version information\n";
 }
@@ -207,6 +238,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
                   << "'. Must be 'static' or 'dynamic'.\n";
         return 1;
       }
+    } else if (arg == "--use-header-stamp-as-log-time") {
+      config.use_header_stamp_as_log_time = true;
     } else {
       std::cerr << "Error: Unknown option '" << arg << "'.\n";
       print_usage(argv[0]);
@@ -503,6 +536,12 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     const auto & topic_name = bag_msg->topic_name;
     auto type_it = topic_types.find(topic_name);
     if (type_it == topic_types.end()) {
+      if (config.use_header_stamp_as_log_time) {
+        auto stamp = extract_header_stamp_from_cdr(*bag_msg->serialized_data);
+        if (stamp) {
+          bag_msg->time_stamp = stamp->nanoseconds();
+        }
+      }
       writer.write(bag_msg);
       continue;
     }
@@ -514,6 +553,12 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
 
     if (!is_nebula && !is_seyond) {
       // Other messages: pass through
+      if (config.use_header_stamp_as_log_time) {
+        auto stamp = extract_header_stamp_from_cdr(*bag_msg->serialized_data);
+        if (stamp) {
+          bag_msg->time_stamp = stamp->nanoseconds();
+        }
+      }
       writer.write(bag_msg);
 
       if (message_count % 1000 == 0) {
@@ -572,9 +617,12 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
       pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
 
+      const auto log_time = config.use_header_stamp_as_log_time
+                              ? rclcpp::Time(pointcloud_msg->header.stamp)
+                              : rclcpp::Time(bag_msg->time_stamp);
       writer.write(
         pc2_msg_serialized, conversion_stats[topic_name].output_topic,
-        "sensor_msgs/msg/PointCloud2", rclcpp::Time(bag_msg->time_stamp));
+        "sensor_msgs/msg/PointCloud2", log_time);
 
       conversion_stats[topic_name].decoded_count++;
     }
