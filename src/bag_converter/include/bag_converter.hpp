@@ -118,6 +118,9 @@ struct BagConverterConfig
   // Passthrough mode (process all messages even without decodable topics)
   bool passthrough = false;
 
+  // In-place mode (overwrite input bag)
+  bool inplace = false;
+
   // Batch mode
   bool batch_mode = false;
 };
