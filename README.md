@@ -47,6 +47,7 @@ cd docker
 | Command | Description                                                 |
 | ------- | ----------------------------------------------------------- |
 | `conv`  | Convert rosbag2 files (decode LiDAR packets to PointCloud2) |
+| `merge` | Merge rosbag2 files from distributed log modules            |
 
 | Option            | Description       |
 | ----------------- | ----------------- |
@@ -117,6 +118,45 @@ In both modes, TF data is pre-loaded from the bag before processing begins, so t
 
 # In-place conversion (overwrites input bag)
 ./bag_converter conv input.mcap --inplace
+```
+
+### merge
+
+Merge multiple rosbag2 files from distributed log modules into single files.
+
+```shell
+./bag_converter merge <input_dir> <output_dir> [options]
+```
+
+Input files must follow the naming pattern:
+
+```text
+<sensing_system_id>_<module_id>_<rest>.(mcap|db3|sqlite3)
+```
+
+- `sensing_system_id`: Vehicle identifier (no underscores)
+- `module_id`: Log module / ECU identifier (no underscores)
+- `rest`: Remaining part (e.g., timestamp), can contain underscores
+
+Files with the same `sensing_system_id` and `rest` are grouped and merged into a single output bag. The output filename drops `module_id`: `<sensing_system_id>_<rest>.<ext>`. Messages are interleaved in timestamp order. Files that do not match the pattern or groups with only a single file are skipped.
+
+The tool searches `input_dir` recursively. All merged files are saved flat into `output_dir`.
+
+#### Options
+
+| Option         | Description                                |
+| -------------- | ------------------------------------------ |
+| `--help`, `-h` | Show help message                          |
+| `--delete`     | Delete source files after successful merge |
+
+#### Examples
+
+```shell
+# Merge bags from distributed log modules
+./bag_converter merge /path/to/input_dir /path/to/output_dir
+
+# Merge and delete source files after successful merge
+./bag_converter merge /path/to/input_dir /path/to/output_dir --delete
 ```
 
 ## Message Types

@@ -21,6 +21,46 @@ if [ -t 0 ]; then
     DOCKER_FLAGS="-it"
 fi
 
+# Merge subcommand: mount input/output directories
+if [ "$1" = "merge" ]; then
+    shift 1
+    if [ $# -ge 2 ] && [ "$1" != "--help" ] && [ "$1" != "-h" ]; then
+        INPUT_ABS=$(realpath "$1")
+        OUTPUT_ABS=$(realpath -m "$2")
+        shift 2
+
+        # Check if --delete is specified (need read-write mount for input)
+        HAS_DELETE=false
+        for arg in "$@"; do
+            if [ "$arg" = "--delete" ]; then
+                HAS_DELETE=true
+                break
+            fi
+        done
+
+        # Create output directory on host so Docker doesn't create it as root
+        mkdir -p "$OUTPUT_ABS"
+
+        if $HAS_DELETE; then
+            INPUT_MOUNT="$INPUT_ABS:/input"
+        else
+            INPUT_MOUNT="$INPUT_ABS:/input:ro"
+        fi
+
+        docker run $DOCKER_FLAGS --rm \
+            -v "$INPUT_MOUNT" \
+            -v "$OUTPUT_ABS":/output \
+            bag_converter:${IMAGE_TAG} \
+            ros2 run bag_converter bag_converter merge /input /output "$@"
+    else
+        # Not enough args or --help: pass to binary
+        docker run $DOCKER_FLAGS --rm \
+            bag_converter:${IMAGE_TAG} \
+            ros2 run bag_converter bag_converter merge "$@"
+    fi
+    exit $?
+fi
+
 # Subcommand dispatch: require "conv" as first argument for mount handling
 if [ "$1" != "conv" ]; then
     # No subcommand (or --help/--version/unknown): pass all args directly to the binary

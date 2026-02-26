@@ -29,6 +29,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
@@ -201,6 +202,22 @@ struct BatchResult
  * @return 0 if all succeeded, 1 if any failed
  */
 int run_batch(const BagConverterConfig & config);
+
+/**
+ * @brief Find all bag files recursively in the given directory
+ * @param input_dir Directory to search
+ * @return Sorted vector of bag file paths (.mcap, .db3, .sqlite3)
+ */
+std::vector<std::filesystem::path> find_bag_files(const std::filesystem::path & input_dir);
+
+/**
+ * @brief Finalize output bag: move storage file to dst_bag_path and clean up temp directory
+ * @param temp_dir The temporary directory containing the bag output
+ * @param dst_path The final destination path for the bag file
+ * @return true on success, false on failure
+ */
+bool finalize_output_bag(
+  const std::filesystem::path & temp_dir, const std::filesystem::path & dst_path);
 
 }  // namespace bag_converter
 

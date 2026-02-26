@@ -9,6 +9,7 @@
 
 #include "bag_converter.hpp"
 
+#include "merge.hpp"
 #include "tf_transformer.hpp"
 
 #include <algorithm>
@@ -114,6 +115,7 @@ void print_top_level_usage()
   std::cout << "Usage: bag_converter <command> [options]\n"
             << "\nCommands:\n"
             << "  conv    Convert rosbag2 files (decode LiDAR packets to PointCloud2)\n"
+            << "  merge   Merge rosbag2 files from distributed log modules\n"
             << "\nOptions:\n"
             << "  -h, --help      Show this help message\n"
             << "  -v, --version   Show version information\n"
@@ -741,7 +743,7 @@ int run(const BagConverterConfig & config)
   return ret == BagConverterResultStatus::kError ? 1 : 0;
 }
 
-static std::vector<fs::path> find_bag_files(const fs::path & input_dir)
+std::vector<fs::path> find_bag_files(const fs::path & input_dir)
 {
   static const std::set<std::string> bag_extensions = {".mcap", ".db3", ".sqlite3"};
   std::vector<fs::path> files;
@@ -897,6 +899,21 @@ static int conv_main(int argc, char ** argv)
   return result;
 }
 
+static int merge_main(int argc, char ** argv)
+{
+  bag_converter::merge::MergeConfig config;
+  auto parse_result = bag_converter::merge::parse_merge_arguments(argc, argv, config);
+  if (parse_result.has_value()) {
+    return parse_result.value();
+  }
+
+  rclcpp::init(argc, argv);
+  int result = bag_converter::merge::run_merge(config);
+  rclcpp::shutdown();
+
+  return result;
+}
+
 int main(int argc, char ** argv)
 {
   if (argc < 2) {
@@ -917,6 +934,9 @@ int main(int argc, char ** argv)
 
   if (command == "conv") {
     return conv_main(argc - 1, argv + 1);
+  }
+  if (command == "merge") {
+    return merge_main(argc - 1, argv + 1);
   }
 
   std::cerr << "Error: Unknown command '" << command << "'.\n";
