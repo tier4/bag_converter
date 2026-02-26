@@ -21,6 +21,18 @@ if [ -t 0 ]; then
     DOCKER_FLAGS="-it"
 fi
 
+# Subcommand dispatch: require "conv" as first argument for mount handling
+if [ "$1" != "conv" ]; then
+    # No subcommand (or --help/--version/unknown): pass all args directly to the binary
+    docker run $DOCKER_FLAGS --rm \
+        bag_converter:${IMAGE_TAG} \
+        ros2 run bag_converter bag_converter "$@"
+    exit $?
+fi
+
+# Strip "conv" subcommand — remaining args are <input> [<output>] [options]
+shift 1
+
 # Check if --inplace is specified
 HAS_INPLACE=false
 for arg in "$@"; do
@@ -30,7 +42,7 @@ for arg in "$@"; do
     fi
 done
 
-# Inplace mode: mount input path as read-write, no output path needed
+# Inplace directory mode
 if $HAS_INPLACE && [ $# -ge 2 ] && [ -d "$1" ]; then
     INPUT_ABS=$(realpath "$1")
     shift 1
@@ -38,8 +50,9 @@ if $HAS_INPLACE && [ $# -ge 2 ] && [ -d "$1" ]; then
     docker run $DOCKER_FLAGS --rm \
         -v "$INPUT_ABS":/data \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter /data "$@"
+        ros2 run bag_converter bag_converter conv /data "$@"
 
+# Inplace single file mode
 elif $HAS_INPLACE && [ $# -ge 2 ]; then
     INPUT_ABS=$(realpath "$1" 2>/dev/null || echo "$1")
     INPUT_DIR=$(dirname "$INPUT_ABS")
@@ -50,7 +63,7 @@ elif $HAS_INPLACE && [ $# -ge 2 ]; then
         -v "$INPUT_DIR":/data \
         -e INPUT_FILE="$INPUT_FILE" \
         bag_converter:${IMAGE_TAG} \
-        sh -c 'ros2 run bag_converter bag_converter "/data/$INPUT_FILE" "$@"' -- "$@"
+        sh -c 'ros2 run bag_converter bag_converter conv "/data/$INPUT_FILE" "$@"' -- "$@"
 
 # Directory mode: mount input/output as directories
 elif [ $# -ge 2 ] && [ -d "$1" ]; then
@@ -65,7 +78,7 @@ elif [ $# -ge 2 ] && [ -d "$1" ]; then
         -v "$INPUT_ABS":/input:ro \
         -v "$OUTPUT_ABS":/output \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter /input /output "$@"
+        ros2 run bag_converter bag_converter conv /input /output "$@"
 
 # Single file mode: mount input/output parent directories
 elif [ $# -ge 2 ]; then
@@ -93,10 +106,10 @@ elif [ $# -ge 2 ]; then
         -e INPUT_FILE="$INPUT_FILE" \
         -e OUTPUT_FILE="$OUTPUT_FILE" \
         bag_converter:${IMAGE_TAG} \
-        sh -c 'ros2 run bag_converter bag_converter "/input/$INPUT_FILE" "/output/$OUTPUT_FILE" "$@"' -- "$@"
+        sh -c 'ros2 run bag_converter bag_converter conv "/input/$INPUT_FILE" "/output/$OUTPUT_FILE" "$@"' -- "$@"
 else
-    # Pass all arguments directly to the binary (let it handle errors)
+    # Not enough args for conv — pass to binary to show conv help
     docker run $DOCKER_FLAGS --rm \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter "$@"
+        ros2 run bag_converter bag_converter conv "$@"
 fi

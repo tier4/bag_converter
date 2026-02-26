@@ -153,10 +153,19 @@ std::string generate_output_topic(
 void print_summary(const std::map<std::string, BagConverterStats> & conversion_stats);
 
 /**
- * @brief Print usage information
- * @param program_name The program name (argv[0])
+ * @brief Print top-level usage (subcommand listing)
  */
-void print_usage(const char * program_name);
+void print_top_level_usage();
+
+/**
+ * @brief Print version information
+ */
+void print_version();
+
+/**
+ * @brief Print usage information for the conv subcommand
+ */
+void print_conv_usage();
 
 /**
  * @brief Parse command line arguments into BagConverterConfig
