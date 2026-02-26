@@ -41,6 +41,27 @@ cd docker
 ## Usage
 
 ```shell
+./bag_converter <command> [options]
+```
+
+| Command | Description                                                 |
+| ------- | ----------------------------------------------------------- |
+| `conv`  | Convert rosbag2 files (decode LiDAR packets to PointCloud2) |
+
+| Option            | Description       |
+| ----------------- | ----------------- |
+| `--help`, `-h`    | Show help message |
+| `--version`, `-v` | Show version      |
+
+Run `./bag_converter <command> --help` for more information on a command.
+
+## Commands
+
+### conv
+
+Convert rosbag2 files containing LiDAR packet messages to PointCloud2 messages.
+
+```shell
 ./bag_converter conv <input_bag> <output_bag> [options]
 ./bag_converter conv <input_dir> <output_dir> [options]
 ./bag_converter conv <input> --inplace [options]
@@ -48,7 +69,7 @@ cd docker
 
 If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in it are automatically converted. The directory structure is mirrored in the output, and output filenames match the input filenames. All options are applied to every file. If a file fails to convert, the error is logged and processing continues with the remaining files.
 
-### conv Options
+#### Options
 
 | Option                           | Description                                                                                                                                                                                     |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -69,7 +90,7 @@ The `--base-frame` option transforms all output PointCloud2 messages to the spec
 
 In both modes, TF data is pre-loaded from the bag before processing begins, so transforms are always available even if TF messages appear after point cloud messages in the bag. The conversion fails if the specified frame is not found or if any point cloud cannot be transformed.
 
-### Examples
+#### Examples
 
 ```shell
 # Basic conversion
