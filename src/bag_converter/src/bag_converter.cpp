@@ -194,7 +194,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
     }
     config.src_bag_path = argv[1];
     config.dst_bag_path = argv[1];
-    options_start = 2;
+    // Skip optional second positional argument (output path is ignored in inplace mode)
+    options_start = (argc >= 3 && argv[2][0] != '-') ? 3 : 2;
   } else {
     if (argc < 3) {
       print_usage(argv[0]);
