@@ -109,12 +109,23 @@ void print_summary(const std::map<std::string, BagConverterStats> & conversion_s
   RCLCPP_INFO(g_logger, "========================================");
 }
 
-void print_usage(const char * program_name)
+void print_top_level_usage()
+{
+  std::cout << "Usage: bag_converter <command> [options]\n"
+            << "\nCommands:\n"
+            << "  conv    Convert rosbag2 files (decode LiDAR packets to PointCloud2)\n"
+            << "\nOptions:\n"
+            << "  -h, --help      Show this help message\n"
+            << "  -v, --version   Show version information\n"
+            << "\nRun 'bag_converter <command> --help' for more information on a command.\n";
+}
+
+void print_conv_usage()
 {
   std::cout
-    << "Usage: " << program_name << " <input_bag> <output_bag> [options]\n"
-    << "       " << program_name << " <input_dir> <output_dir> [options]\n"
-    << "       " << program_name << " <input> --inplace [options]\n"
+    << "Usage: bag_converter conv <input_bag> <output_bag> [options]\n"
+    << "       bag_converter conv <input_dir> <output_dir> [options]\n"
+    << "       bag_converter conv <input> --inplace [options]\n"
     << "\nUnified bag converter for Seyond LiDAR topics.\n"
     << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
     << "\nSupported input formats:\n"
@@ -169,7 +180,7 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--help" || arg == "-h") {
-      print_usage(argv[0]);
+      print_conv_usage();
       return 0;  // Help requested, exit with success
     }
     if (arg == "--version" || arg == "-v") {
@@ -189,7 +200,7 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
   int options_start;
   if (config.inplace) {
     if (argc < 2) {
-      print_usage(argv[0]);
+      print_conv_usage();
       return 1;
     }
     config.src_bag_path = argv[1];
@@ -198,7 +209,7 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
     options_start = (argc >= 3 && argv[2][0] != '-') ? 3 : 2;
   } else {
     if (argc < 3) {
-      print_usage(argv[0]);
+      print_conv_usage();
       return 1;  // Error: missing arguments
     }
     config.src_bag_path = argv[1];
@@ -280,7 +291,7 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       // Already processed in pre-scan
     } else {
       std::cerr << "Error: Unknown option '" << arg << "'.\n";
-      print_usage(argv[0]);
+      print_conv_usage();
       return 1;
     }
   }
@@ -871,7 +882,7 @@ int run_batch(const BagConverterConfig & config)
 
 }  // namespace bag_converter
 
-int main(int argc, char ** argv)
+static int conv_main(int argc, char ** argv)
 {
   bag_converter::BagConverterConfig config;
   auto parse_result = bag_converter::parse_arguments(argc, argv, config);
@@ -884,4 +895,31 @@ int main(int argc, char ** argv)
   rclcpp::shutdown();
 
   return result;
+}
+
+int main(int argc, char ** argv)
+{
+  if (argc < 2) {
+    bag_converter::print_top_level_usage();
+    return 1;
+  }
+
+  std::string command = argv[1];
+
+  if (command == "--help" || command == "-h") {
+    bag_converter::print_top_level_usage();
+    return 0;
+  }
+  if (command == "--version" || command == "-v") {
+    bag_converter::print_version();
+    return 0;
+  }
+
+  if (command == "conv") {
+    return conv_main(argc - 1, argv + 1);
+  }
+
+  std::cerr << "Error: Unknown command '" << command << "'.\n";
+  bag_converter::print_top_level_usage();
+  return 1;
 }

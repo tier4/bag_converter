@@ -41,14 +41,14 @@ cd docker
 ## Usage
 
 ```shell
-./bag_converter <input_bag> <output_bag> [options]
-./bag_converter <input_dir> <output_dir> [options]
-./bag_converter <input> --inplace [options]
+./bag_converter conv <input_bag> <output_bag> [options]
+./bag_converter conv <input_dir> <output_dir> [options]
+./bag_converter conv <input> --inplace [options]
 ```
 
 If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in it are automatically converted. The directory structure is mirrored in the output, and output filenames match the input filenames. All options are applied to every file. If a file fails to convert, the error is logged and processing continues with the remaining files.
 
-### Options
+### conv Options
 
 | Option                           | Description                                                                                                                                                                                     |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -73,28 +73,29 @@ In both modes, TF data is pre-loaded from the bag before processing begins, so t
 
 ```shell
 # Basic conversion
-./bag_converter input.mcap output.mcap
+./bag_converter conv input.mcap output.mcap
 
 # Show help
 ./bag_converter --help
+./bag_converter conv --help
 
 # Specify output point type (xyzi without timestamp field)
-./bag_converter input.mcap output.mcap --point-type xyzi
+./bag_converter conv input.mcap output.mcap --point-type xyzi
 
 # Keep original packet topics in output
-./bag_converter input.mcap output.mcap --keep-original
+./bag_converter conv input.mcap output.mcap --keep-original
 
 # Convert all bag files in a directory (batch mode)
-./bag_converter /path/to/input_dir /path/to/output_dir
+./bag_converter conv /path/to/input_dir /path/to/output_dir
 
 # Batch mode with options
-./bag_converter /path/to/input_dir /path/to/output_dir --point-type xyzi
+./bag_converter conv /path/to/input_dir /path/to/output_dir --point-type xyzi
 
 # Transform point clouds to base_link frame (static TF, default)
-./bag_converter input.mcap output.mcap --base-frame base_link
+./bag_converter conv input.mcap output.mcap --base-frame base_link
 
 # In-place conversion (overwrites input bag)
-./bag_converter input.mcap --inplace
+./bag_converter conv input.mcap --inplace
 ```
 
 ## Message Types
