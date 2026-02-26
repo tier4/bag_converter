@@ -192,9 +192,20 @@ static int64_t merge_group(
     return -1;
   }
 
-  // Create temp directory for output
+  // Create temp directory for output (remove stale leftovers from previous failed runs)
   fs::path temp_dir = output_path.string() + "_tmp";
   std::error_code ec;
+  if (fs::exists(temp_dir)) {
+    RCLCPP_WARN(
+      g_logger, "Removing stale temp directory from previous run: %s", temp_dir.string().c_str());
+    fs::remove_all(temp_dir, ec);
+    if (ec) {
+      RCLCPP_ERROR(
+        g_logger, "Failed to remove stale temp directory '%s': %s", temp_dir.string().c_str(),
+        ec.message().c_str());
+      return -1;
+    }
+  }
   fs::create_directories(temp_dir, ec);
   if (ec) {
     RCLCPP_ERROR(
