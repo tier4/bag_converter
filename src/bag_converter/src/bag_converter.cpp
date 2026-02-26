@@ -16,6 +16,7 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <queue>
 #include <set>
 #include <vector>
 
@@ -110,25 +111,13 @@ void print_summary(const std::map<std::string, BagConverterStats> & conversion_s
   RCLCPP_INFO(g_logger, "========================================");
 }
 
-void print_top_level_usage()
-{
-  std::cout << "Usage: bag_converter <command> [options]\n"
-            << "\nCommands:\n"
-            << "  conv    Convert rosbag2 files (decode LiDAR packets to PointCloud2)\n"
-            << "  merge   Merge rosbag2 files from distributed log modules\n"
-            << "\nOptions:\n"
-            << "  -h, --help      Show this help message\n"
-            << "  -v, --version   Show version information\n"
-            << "\nRun 'bag_converter <command> --help' for more information on a command.\n";
-}
-
-void print_conv_usage()
+void print_usage()
 {
   std::cout
-    << "Usage: bag_converter conv <input_bag> <output_bag> [options]\n"
-    << "       bag_converter conv <input_dir> <output_dir> [options]\n"
-    << "       bag_converter conv <input> --inplace [options]\n"
-    << "\nUnified bag converter for Seyond LiDAR topics.\n"
+    << "Usage: bag_converter <input_bag> <output_bag> [options]\n"
+    << "       bag_converter <input_dir> <output_dir> [options]\n"
+    << "       bag_converter <input_dir_0> [input_dir_1 ...] <output_dir> --merge [options]\n"
+    << "\nBag converter for Seyond LiDAR topics.\n"
     << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
     << "\nSupported input formats:\n"
     << "  - nebula_msgs/msg/NebulaPackets (topics containing '/nebula_packets')\n"
@@ -142,6 +131,13 @@ void print_conv_usage()
     << "  Use --timescale-correction-ref to specify the rosbag recording timescale.\n"
     << "\nIf <input> is a directory, all bag files (.mcap, .db3, .sqlite3) in it are\n"
     << "converted. The directory structure is mirrored in the output directory.\n"
+    << "\nMerge mode (--merge):\n"
+    << "  When --merge is specified, bag files from one or more input directories are\n"
+    << "  first merged (by naming pattern), then converted. The last positional argument\n"
+    << "  is the output directory; all preceding positional arguments are input directories.\n"
+    << "  Input files must follow the naming pattern:\n"
+    << "    <sensing_system_id>_<module_id>_<rest>.(mcap|db3|sqlite3)\n"
+    << "  Files with the same sensing_system_id and rest are merged together.\n"
     << "\nOptions:\n"
     << "  --keep-original           Keep original packet topics in output bag\n"
     << "  --min-range <value>       Minimum range in meters (default: 0.3)\n"
@@ -165,9 +161,11 @@ void print_conv_usage()
     << "  --passthrough             Process all messages even without decodable topics.\n"
     << "                            Useful with --use-header-stamp-as-log-time to rewrite\n"
     << "                            log_time for bags without LiDAR packet topics.\n"
-    << "  --inplace                 Modify the input bag in-place. No output path needed.\n"
-    << "                            The original file is preserved until processing\n"
-    << "                            completes successfully.\n"
+    << "  --merge                   Merge bag files from distributed log modules, then\n"
+    << "                            convert. Accepts multiple input directories.\n"
+    << "  --delete                  Delete source bag files after successful processing.\n"
+    << "                            In merge mode, deletes the original input bag files\n"
+    << "                            after each group is successfully merged and converted.\n"
     << "  -h, --help                Show this help message\n"
     << "  -v, --version             Show version information\n";
 }
@@ -177,55 +175,80 @@ void print_version()
   std::cout << BAG_CONVERTER_VERSION << std::endl;
 }
 
+/**
+ * @brief Check if an option takes a value argument
+ */
+static bool option_takes_value(const std::string & arg)
+{
+  return arg == "--min-range" || arg == "--max-range" || arg == "--point-type" ||
+         arg == "--timescale-correction" || arg == "--timescale-correction-ref" ||
+         arg == "--min-conf-level" || arg == "--base-frame" || arg == "--tf-mode";
+}
+
 std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & config)
 {
+  // Pre-scan for --help, --version, --merge, --delete
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--help" || arg == "-h") {
-      print_conv_usage();
-      return 0;  // Help requested, exit with success
+      print_usage();
+      return 0;
     }
     if (arg == "--version" || arg == "-v") {
       print_version();
-      return 0;  // Version requested, exit with success
+      return 0;
+    }
+    if (arg == "--merge") {
+      config.merge = true;
+    }
+    if (arg == "--delete") {
+      config.delete_sources = true;
     }
   }
 
-  // Pre-scan for --inplace to determine argument layout
+  // Collect positional arguments (non-option args)
+  std::vector<std::string> positional;
   for (int i = 1; i < argc; i++) {
-    if (std::string(argv[i]) == "--inplace") {
-      config.inplace = true;
-      break;
+    std::string arg = argv[i];
+    if (arg[0] == '-') {
+      // Skip the value of options that take one
+      if (option_takes_value(arg) && i + 1 < argc) {
+        i++;
+      }
+      continue;
     }
+    positional.push_back(arg);
   }
 
-  int options_start;
-  if (config.inplace) {
-    if (argc < 2) {
-      print_conv_usage();
+  // Determine input/output paths based on mode
+  if (config.merge) {
+    if (positional.size() < 2) {
+      std::cerr
+        << "Error: --merge requires at least one input directory and one output directory.\n";
+      print_usage();
       return 1;
     }
-    config.src_bag_path = argv[1];
-    config.dst_bag_path = argv[1];
-    // Skip optional second positional argument (output path is ignored in inplace mode)
-    options_start = (argc >= 3 && argv[2][0] != '-') ? 3 : 2;
-  } else {
-    if (argc < 3) {
-      print_conv_usage();
-      return 1;  // Error: missing arguments
-    }
-    config.src_bag_path = argv[1];
-    config.dst_bag_path = argv[2];
-    options_start = 3;
-  }
-
-  // Auto-detect batch mode if input path is a directory
-  if (fs::is_directory(config.src_bag_path)) {
+    config.dst_bag_path = positional.back();
+    config.input_dirs.assign(positional.begin(), positional.end() - 1);
     config.batch_mode = true;
+  } else {
+    if (positional.size() < 2) {
+      print_usage();
+      return 1;
+    }
+    config.src_bag_path = positional[0];
+    config.dst_bag_path = positional[1];
+    if (fs::is_directory(config.src_bag_path)) {
+      config.batch_mode = true;
+    }
   }
 
-  for (int i = options_start; i < argc; i++) {
+  // Parse option flags
+  for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
+    if (arg[0] != '-') {
+      continue;  // Skip positional args
+    }
     if (arg == "--keep-original") {
       config.keep_original_topics = true;
     } else if (arg == "--min-range" && i + 1 < argc) {
@@ -289,11 +312,13 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       config.use_header_stamp_as_log_time = true;
     } else if (arg == "--passthrough") {
       config.passthrough = true;
-    } else if (arg == "--inplace") {
+    } else if (arg == "--merge" || arg == "--delete") {
       // Already processed in pre-scan
+    } else if (arg == "--help" || arg == "-h" || arg == "--version" || arg == "-v") {
+      // Already handled
     } else {
       std::cerr << "Error: Unknown option '" << arg << "'.\n";
-      print_conv_usage();
+      print_usage();
       return 1;
     }
   }
@@ -407,10 +432,8 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
 
   const fs::path dst_path(config.dst_bag_path);
 
-  // Check if input and output paths refer to the same file (allowed in inplace mode)
-  if (
-    !config.inplace && fs::exists(dst_path) &&
-    fs::canonical(config.src_bag_path) == fs::canonical(dst_path)) {
+  // Check if input and output paths refer to the same file
+  if (fs::exists(dst_path) && fs::canonical(config.src_bag_path) == fs::canonical(dst_path)) {
     RCLCPP_ERROR(
       g_logger, "Input and output bag paths must not be the same: %s", config.src_bag_path.c_str());
     return BagConverterResultStatus::kError;
@@ -424,8 +447,8 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     fs::create_directories(dst_path.parent_path());
   }
 
-  // Remove existing output file if present (skip in inplace mode to preserve input)
-  if (!config.inplace && fs::exists(dst_path)) {
+  // Remove existing output file if present
+  if (fs::exists(dst_path)) {
     RCLCPP_INFO(g_logger, "Removing existing output file: %s", dst_path.c_str());
     fs::remove(dst_path);
   }
@@ -619,7 +642,7 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       }
       writer.write(bag_msg);
 
-      if (message_count % 1000 == 0) {
+      if (message_count % defaults::progress_log_interval == 0) {
         RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
       }
       continue;
@@ -685,7 +708,7 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       conversion_stats[topic_name].decoded_count++;
     }
 
-    if (message_count % 1000 == 0) {
+    if (message_count % defaults::progress_log_interval == 0) {
       RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
     }
   }
@@ -740,7 +763,23 @@ int run(const BagConverterConfig & config)
 {
   log_config(config);
   auto ret = run_single(config);
-  return ret == BagConverterResultStatus::kError ? 1 : 0;
+  if (ret == BagConverterResultStatus::kError) {
+    return 1;
+  }
+
+  if (config.delete_sources && ret == BagConverterResultStatus::kSuccess) {
+    std::error_code ec;
+    fs::remove(config.src_bag_path, ec);
+    if (ec) {
+      RCLCPP_WARN(
+        g_logger, "Failed to delete source file '%s': %s", config.src_bag_path.c_str(),
+        ec.message().c_str());
+    } else {
+      RCLCPP_INFO(g_logger, "Deleted source file: %s", config.src_bag_path.c_str());
+    }
+  }
+
+  return 0;
 }
 
 std::vector<fs::path> find_bag_files(const fs::path & input_dir)
@@ -801,8 +840,8 @@ int run_batch(const BagConverterConfig & config)
     return 1;
   }
 
-  // Check input != output (allowed in inplace mode)
-  if (!config.inplace) {
+  // Check input != output
+  {
     std::error_code ec;
     const auto input_canonical = fs::canonical(input_dir, ec);
     if (!ec && fs::exists(output_dir)) {
@@ -813,18 +852,18 @@ int run_batch(const BagConverterConfig & config)
         return 1;
       }
     }
+  }
 
-    // Create output directory if needed
-    if (!fs::exists(output_dir)) {
-      RCLCPP_INFO(g_logger, "Creating output directory: %s", output_dir.c_str());
-      std::error_code create_ec;
-      fs::create_directories(output_dir, create_ec);
-      if (create_ec) {
-        RCLCPP_ERROR(
-          g_logger, "Failed to create output directory %s: %s", output_dir.c_str(),
-          create_ec.message().c_str());
-        return 1;
-      }
+  // Create output directory if needed
+  if (!fs::exists(output_dir)) {
+    RCLCPP_INFO(g_logger, "Creating output directory: %s", output_dir.c_str());
+    std::error_code create_ec;
+    fs::create_directories(output_dir, create_ec);
+    if (create_ec) {
+      RCLCPP_ERROR(
+        g_logger, "Failed to create output directory %s: %s", output_dir.c_str(),
+        create_ec.message().c_str());
+      return 1;
     }
   }
 
@@ -869,6 +908,17 @@ int run_batch(const BagConverterConfig & config)
         result.failed_files.push_back(relative.string());
       } else {
         result.success_count++;
+        if (config.delete_sources) {
+          std::error_code del_ec;
+          fs::remove(bag_file, del_ec);
+          if (del_ec) {
+            RCLCPP_WARN(
+              g_logger, "Failed to delete source file '%s': %s", bag_file.c_str(),
+              del_ec.message().c_str());
+          } else {
+            RCLCPP_INFO(g_logger, "  Deleted source: %s", relative.c_str());
+          }
+        }
       }
     } catch (const std::exception & e) {
       RCLCPP_ERROR(g_logger, "  Exception converting %s: %s", relative.c_str(), e.what());
@@ -882,9 +932,305 @@ int run_batch(const BagConverterConfig & config)
   return result.fail_count > 0 ? 1 : 0;
 }
 
+/**
+ * @brief Combined merge + convert for a single group (single-pass)
+ *
+ * K-way merges multiple bag files while simultaneously decoding LiDAR packet
+ * topics to PointCloud2. This avoids writing an intermediate merged bag to disk.
+ */
+template <typename PointT>
+static int64_t merge_and_convert_group(
+  const std::vector<fs::path> & bag_files, const fs::path & output_path,
+  const std::string & storage_identifier, const BagConverterConfig & config)
+{
+  // 1. Collect topic union
+  auto topic_union = merge::collect_topic_union(bag_files);
+  if (!topic_union.has_value()) {
+    return -1;
+  }
+
+  // 2. Build topic type map and detect decodable/TF topics
+  std::map<std::string, std::string> topic_types;
+  bool has_decodable_topics = false;
+  bool has_tf_topic = false;
+  for (const auto & [name, meta] : topic_union.value()) {
+    topic_types[name] = meta.type;
+    if (meta.type == "nebula_msgs/msg/NebulaPackets" || meta.type == "seyond/msg/SeyondScan") {
+      has_decodable_topics = true;
+    }
+    if (meta.type == "tf2_msgs/msg/TFMessage") {
+      has_tf_topic = true;
+    }
+  }
+
+  if (!has_decodable_topics && !config.passthrough) {
+    RCLCPP_INFO(g_logger, "No decodable topics found. Performing merge only (no conversion).");
+  }
+
+  // 3. Create TF transformer and pre-load from all input bags
+  std::unique_ptr<tf_transformer::TfTransformer> transformer;
+  if (!config.frame.empty()) {
+    if (!has_tf_topic) {
+      RCLCPP_ERROR(
+        g_logger, "No TF topics found in input bags. Cannot transform to frame '%s'",
+        config.frame.c_str());
+      return -1;
+    }
+
+    transformer = std::make_unique<tf_transformer::TfTransformer>(config.tf_mode);
+    const char * tf_mode_str = config.tf_mode == BagConverterTfMode::kStatic ? "static" : "dynamic";
+    RCLCPP_INFO(
+      g_logger, "Loading TF data from %zu bags (%s mode)...", bag_files.size(), tf_mode_str);
+
+    for (const auto & bag_path : bag_files) {
+      rosbag2_storage::StorageOptions opts;
+      opts.uri = bag_path.string();
+      rosbag2_cpp::Reader tf_reader;
+      tf_reader.open(opts);
+      while (tf_reader.has_next()) {
+        auto msg = tf_reader.read_next();
+        auto it = topic_types.find(msg->topic_name);
+        if (it != topic_types.end() && it->second == "tf2_msgs/msg/TFMessage") {
+          rclcpp::SerializedMessage serialized_tf(*msg->serialized_data);
+          transformer->add_transforms(serialized_tf, msg->topic_name);
+          if (
+            config.tf_mode == BagConverterTfMode::kStatic && transformer->has_frame(config.frame)) {
+            break;
+          }
+        }
+      }
+      if (config.tf_mode == BagConverterTfMode::kStatic && transformer->has_frame(config.frame)) {
+        break;
+      }
+    }
+
+    if (!transformer->has_frame(config.frame)) {
+      RCLCPP_ERROR(g_logger, "Frame '%s' does not exist in TF data", config.frame.c_str());
+      return -1;
+    }
+    RCLCPP_INFO(g_logger, "TF data loaded");
+  }
+
+  // 4. Remove stale temp directory
+  fs::path temp_dir = output_path.string() + "_tmp";
+  std::error_code ec;
+  if (fs::exists(temp_dir)) {
+    RCLCPP_WARN(
+      g_logger, "Removing stale temp directory from previous run: %s", temp_dir.string().c_str());
+    fs::remove_all(temp_dir, ec);
+    if (ec) {
+      RCLCPP_ERROR(
+        g_logger, "Failed to remove stale temp directory '%s': %s", temp_dir.string().c_str(),
+        ec.message().c_str());
+      return -1;
+    }
+  }
+
+  // 5. Open writer
+  rosbag2_storage::StorageOptions storage_options_out;
+  storage_options_out.uri = temp_dir.string();
+  storage_options_out.storage_id = storage_identifier;
+
+  rosbag2_cpp::Writer writer;
+  writer.open(storage_options_out);
+
+  // 6. Create output topics
+  for (const auto & [name, meta] : topic_union.value()) {
+    bool is_nebula = (meta.type == "nebula_msgs/msg/NebulaPackets");
+    bool is_seyond = (meta.type == "seyond/msg/SeyondScan");
+
+    if (is_nebula || is_seyond) {
+      // Create PointCloud2 output topic
+      std::string output_topic;
+      if (is_nebula) {
+        output_topic = generate_output_topic(name, "/nebula_packets", "/nebula_points");
+      } else {
+        output_topic = generate_output_topic(name, "/seyond_packets", "/seyond_points");
+      }
+
+      rosbag2_storage::TopicMetadata pc_meta;
+      pc_meta.name = output_topic;
+      pc_meta.type = "sensor_msgs/msg/PointCloud2";
+      pc_meta.serialization_format = "cdr";
+      writer.create_topic(pc_meta);
+
+      if (config.keep_original_topics) {
+        writer.create_topic(meta);
+      }
+    } else {
+      writer.create_topic(meta);
+    }
+  }
+
+  // 7. Open all readers and seed the min-heap
+  std::vector<std::unique_ptr<rosbag2_cpp::Reader>> readers;
+  std::priority_queue<merge::HeapEntry, std::vector<merge::HeapEntry>, merge::HeapCompare> min_heap;
+
+  for (size_t i = 0; i < bag_files.size(); ++i) {
+    auto reader = std::make_unique<rosbag2_cpp::Reader>();
+    rosbag2_storage::StorageOptions storage_options_in;
+    storage_options_in.uri = bag_files[i].string();
+    reader->open(storage_options_in);
+
+    if (reader->has_next()) {
+      auto msg = reader->read_next();
+      min_heap.push({msg, i});
+    }
+    readers.push_back(std::move(reader));
+  }
+
+  // 8. Decoder map and serializer
+  rclcpp::Serialization<sensor_msgs::msg::PointCloud2> pc2_serializer;
+  std::map<std::string, std::unique_ptr<decoder::BasePCDDecoder>> decoders;
+  std::map<std::string, BagConverterStats> conversion_stats;
+
+  // 9. K-way merge loop with inline conversion
+  int64_t message_count = 0;
+  while (!min_heap.empty() && rclcpp::ok()) {
+    auto entry = min_heap.top();
+    min_heap.pop();
+
+    const auto & topic_name = entry.message->topic_name;
+    auto type_it = topic_types.find(topic_name);
+    const auto & topic_type = (type_it != topic_types.end()) ? type_it->second : std::string();
+
+    bool is_nebula = (topic_type == "nebula_msgs/msg/NebulaPackets");
+    bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
+
+    if (is_nebula || is_seyond) {
+      // Keep original if requested
+      if (config.keep_original_topics) {
+        writer.write(entry.message);
+      }
+
+      // Create decoder lazily
+      if (decoders.find(topic_name) == decoders.end()) {
+        DriverType driver_type = is_nebula ? DriverType::kNebula : DriverType::kSeyond;
+        decoders[topic_name] =
+          create_decoder<PointT>(driver_type, topic_name, config, conversion_stats);
+      }
+
+      // Decode
+      rclcpp::SerializedMessage serialized_msg(*entry.message->serialized_data);
+      auto & dec = decoders[topic_name];
+      auto pointcloud_msg = dec->decode(serialized_msg);
+
+      if (pointcloud_msg) {
+        const size_t num_points = pointcloud_msg->width * pointcloud_msg->height;
+        if (num_points < defaults::min_points_per_scan) {
+          RCLCPP_INFO(g_logger, "Status packets detected (skipped decoding this message)");
+          conversion_stats[topic_name].skipped_count++;
+        } else {
+          // Timescale correction
+          if (config.timescale_correction) {
+            const std::uint64_t sensor_time_ns =
+              static_cast<std::uint64_t>(pointcloud_msg->header.stamp.sec) * 1000000000 +
+              static_cast<std::uint64_t>(pointcloud_msg->header.stamp.nanosec);
+            const std::uint64_t sensor_time_ns_corrected = timescale::correct_timescale(
+              sensor_time_ns, rclcpp::Time(entry.message->time_stamp).nanoseconds(),
+              config.timescale_correction_ref);
+            if (sensor_time_ns_corrected != sensor_time_ns) {
+              pointcloud_msg->header.stamp.sec = sensor_time_ns_corrected / 1000000000;
+              pointcloud_msg->header.stamp.nanosec = sensor_time_ns_corrected % 1000000000;
+            }
+          }
+
+          // TF transform
+          if (transformer) {
+            if (!transformer->transform(*pointcloud_msg, config.frame)) {
+              RCLCPP_ERROR(
+                g_logger, "TF transform failed for frame: %s",
+                pointcloud_msg->header.frame_id.c_str());
+              fs::remove_all(temp_dir, ec);
+              return -1;
+            }
+          }
+
+          // Serialize and write
+          auto pc2_serialized = std::make_shared<rclcpp::SerializedMessage>();
+          pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_serialized.get());
+
+          const auto log_time = config.use_header_stamp_as_log_time
+                                  ? rclcpp::Time(pointcloud_msg->header.stamp)
+                                  : rclcpp::Time(entry.message->time_stamp);
+          writer.write(
+            pc2_serialized, conversion_stats[topic_name].output_topic,
+            "sensor_msgs/msg/PointCloud2", log_time);
+
+          conversion_stats[topic_name].decoded_count++;
+        }
+      }
+    } else {
+      // Non-decodable topic: passthrough with optional log_time override
+      if (config.use_header_stamp_as_log_time) {
+        auto stamp = extract_header_stamp_from_cdr(*entry.message->serialized_data);
+        if (stamp) {
+          entry.message->time_stamp = stamp->nanoseconds();
+        }
+      }
+      writer.write(entry.message);
+    }
+
+    ++message_count;
+    if (message_count % defaults::progress_log_interval == 0) {
+      RCLCPP_INFO(g_logger, "  Processed %ld messages...", message_count);
+    }
+
+    // Read next message from the same reader
+    auto & reader = readers[entry.reader_index];
+    if (reader->has_next()) {
+      auto next_msg = reader->read_next();
+      min_heap.push({next_msg, entry.reader_index});
+    }
+  }
+
+  if (!rclcpp::ok()) {
+    RCLCPP_WARN(g_logger, "Interrupted by user (Ctrl+C), merge+convert terminated early");
+  }
+
+  print_summary(conversion_stats);
+
+  // Close writer and finalize
+  writer.close();
+  if (!finalize_output_bag(temp_dir, output_path)) {
+    return -1;
+  }
+
+  return message_count;
+}
+
+int run_merge_and_convert(const BagConverterConfig & config)
+{
+  log_config(config);
+
+  merge::MergeConfig merge_config;
+  merge_config.input_dirs = config.input_dirs;
+  merge_config.output_dir = config.dst_bag_path;
+  merge_config.delete_sources = config.delete_sources;
+
+  auto processor = [&config](
+                     const std::vector<fs::path> & bag_files, const fs::path & output_path,
+                     const std::string & storage_identifier) -> int64_t {
+    switch (config.point_type) {
+      case PointType::kXYZI:
+        return merge_and_convert_group<point::PointXYZI>(
+          bag_files, output_path, storage_identifier, config);
+      case PointType::kXYZIT:
+        return merge_and_convert_group<point::PointXYZIT>(
+          bag_files, output_path, storage_identifier, config);
+      case PointType::kEnXYZIT:
+        return merge_and_convert_group<point::PointEnXYZIT>(
+          bag_files, output_path, storage_identifier, config);
+    }
+    return -1;
+  };
+
+  return merge::run_merge(merge_config, processor);
+}
+
 }  // namespace bag_converter
 
-static int conv_main(int argc, char ** argv)
+int main(int argc, char ** argv)
 {
   bag_converter::BagConverterConfig config;
   auto parse_result = bag_converter::parse_arguments(argc, argv, config);
@@ -893,53 +1239,16 @@ static int conv_main(int argc, char ** argv)
   }
 
   rclcpp::init(argc, argv);
-  int result = config.batch_mode ? bag_converter::run_batch(config) : bag_converter::run(config);
+
+  int result;
+  if (config.merge) {
+    result = bag_converter::run_merge_and_convert(config);
+  } else if (config.batch_mode) {
+    result = bag_converter::run_batch(config);
+  } else {
+    result = bag_converter::run(config);
+  }
+
   rclcpp::shutdown();
-
   return result;
-}
-
-static int merge_main(int argc, char ** argv)
-{
-  bag_converter::merge::MergeConfig config;
-  auto parse_result = bag_converter::merge::parse_merge_arguments(argc, argv, config);
-  if (parse_result.has_value()) {
-    return parse_result.value();
-  }
-
-  rclcpp::init(argc, argv);
-  int result = bag_converter::merge::run_merge(config);
-  rclcpp::shutdown();
-
-  return result;
-}
-
-int main(int argc, char ** argv)
-{
-  if (argc < 2) {
-    bag_converter::print_top_level_usage();
-    return 1;
-  }
-
-  std::string command = argv[1];
-
-  if (command == "--help" || command == "-h") {
-    bag_converter::print_top_level_usage();
-    return 0;
-  }
-  if (command == "--version" || command == "-v") {
-    bag_converter::print_version();
-    return 0;
-  }
-
-  if (command == "conv") {
-    return conv_main(argc - 1, argv + 1);
-  }
-  if (command == "merge") {
-    return merge_main(argc - 1, argv + 1);
-  }
-
-  std::cerr << "Error: Unknown command '" << command << "'.\n";
-  bag_converter::print_top_level_usage();
-  return 1;
 }

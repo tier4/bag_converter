@@ -3,7 +3,7 @@
  *
  *  License: Apache License
  *
- *  Merge subcommand: merge multiple rosbag2 files from distributed log modules
+ *  Merge: merge multiple rosbag2 files from distributed log modules
  */
 
 #include "merge.hpp"
@@ -16,9 +16,7 @@
 #include <rosbag2_storage/storage_options.hpp>
 
 #include <algorithm>
-#include <cstring>
 #include <filesystem>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <optional>
@@ -59,26 +57,6 @@ struct MergeGroupKey
   bool operator<(const MergeGroupKey & other) const
   {
     return std::tie(sensing_system_id, rest) < std::tie(other.sensing_system_id, other.rest);
-  }
-};
-
-/**
- * @brief Entry in the min-heap for k-way merge
- */
-struct HeapEntry
-{
-  std::shared_ptr<rosbag2_storage::SerializedBagMessage> message;
-  size_t reader_index;
-};
-
-/**
- * @brief Comparator for min-heap (smallest timestamp first)
- */
-struct HeapCompare
-{
-  bool operator()(const HeapEntry & a, const HeapEntry & b) const
-  {
-    return a.message->time_stamp > b.message->time_stamp;
   }
 };
 
@@ -137,12 +115,7 @@ static std::optional<ParsedBagFilename> parse_bag_filename(const std::string & f
   return result;
 }
 
-/**
- * @brief Collect the union of all topics from multiple bag files
- * @param bag_files List of bag file paths
- * @return Map of topic name to TopicMetadata, or nullopt if duplicate topics found across bags
- */
-static std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> collect_topic_union(
+std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> collect_topic_union(
   const std::vector<fs::path> & bag_files)
 {
   std::map<std::string, rosbag2_storage::TopicMetadata> topic_union;
@@ -160,12 +133,10 @@ static std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> coll
       auto it = topic_union.find(topic_meta.name);
 
       if (it != topic_union.end()) {
-        if (it->second.type != topic_meta.type) {
-          RCLCPP_ERROR(
-            g_logger, "Topic '%s' has conflicting types: '%s' vs '%s' across bags. Skipping group.",
-            topic_meta.name.c_str(), it->second.type.c_str(), topic_meta.type.c_str());
-          return std::nullopt;
-        }
+        RCLCPP_ERROR(
+          g_logger, "Duplicate topic '%s' found across bags. Skipping group.",
+          topic_meta.name.c_str());
+        return std::nullopt;
       } else {
         topic_union[topic_meta.name] = topic_meta;
       }
@@ -247,7 +218,7 @@ static int64_t merge_group(
     ++message_count;
 
     // Log progress
-    if (message_count % 10000 == 0) {
+    if (message_count % defaults::progress_log_interval == 0) {
       RCLCPP_INFO(g_logger, "  Merged %ld messages...", message_count);
     }
 
@@ -260,9 +231,7 @@ static int64_t merge_group(
   }
 
   if (!rclcpp::ok()) {
-    RCLCPP_WARN(g_logger, "Merge interrupted by signal");
-    fs::remove_all(temp_dir, ec);
-    return -1;
+    RCLCPP_WARN(g_logger, "Interrupted by user (Ctrl+C), merge terminated early");
   }
 
   // Close writer
@@ -299,63 +268,17 @@ static void print_merge_summary(const MergeResult & result)
   RCLCPP_INFO(g_logger, "===================================");
 }
 
-void print_merge_usage()
+int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
 {
-  std::cout << "Usage: bag_converter merge <input_dir> <output_dir> [options]\n"
-            << "\nMerge rosbag2 files from distributed log modules into single files.\n"
-            << "\nInput files must follow the naming pattern:\n"
-            << "  <sensing_system_id>_<module_id>_<rest>.(mcap|db3|sqlite3)\n"
-            << "\nFiles with the same sensing_system_id and rest are merged together.\n"
-            << "Output filename: <sensing_system_id>_<rest>.<ext>\n"
-            << "\nOptions:\n"
-            << "  -h, --help    Show this help message\n"
-            << "  --delete      Delete source files after successful merge\n";
-}
-
-std::optional<int> parse_merge_arguments(int argc, char ** argv, MergeConfig & config)
-{
-  if (argc < 3) {
-    // Check for --help with fewer args
-    for (int i = 1; i < argc; ++i) {
-      if (std::strcmp(argv[i], "--help") == 0 || std::strcmp(argv[i], "-h") == 0) {
-        print_merge_usage();
-        return 0;
-      }
-    }
-    std::cerr << "Error: merge requires <input_dir> and <output_dir> arguments.\n";
-    print_merge_usage();
-    return 1;
-  }
-
-  config.input_dir = argv[1];
-  config.output_dir = argv[2];
-
-  // Parse options
-  for (int i = 3; i < argc; ++i) {
-    if (std::strcmp(argv[i], "--help") == 0 || std::strcmp(argv[i], "-h") == 0) {
-      print_merge_usage();
-      return 0;
-    } else if (std::strcmp(argv[i], "--delete") == 0) {
-      config.delete_after_merge = true;
-    } else {
-      std::cerr << "Error: Unknown option '" << argv[i] << "'.\n";
-      print_merge_usage();
-      return 1;
-    }
-  }
-
-  return std::nullopt;
-}
-
-int run_merge(const MergeConfig & config)
-{
-  fs::path input_dir(config.input_dir);
   fs::path output_dir(config.output_dir);
 
-  // Validate input directory
-  if (!fs::is_directory(input_dir)) {
-    RCLCPP_ERROR(g_logger, "Input path is not a directory: %s", input_dir.string().c_str());
-    return 1;
+  // Validate input directories
+  for (const auto & input_dir_str : config.input_dirs) {
+    fs::path input_dir(input_dir_str);
+    if (!fs::is_directory(input_dir)) {
+      RCLCPP_ERROR(g_logger, "Input path is not a directory: %s", input_dir.string().c_str());
+      return 1;
+    }
   }
 
   // Create output directory
@@ -368,15 +291,20 @@ int run_merge(const MergeConfig & config)
     return 1;
   }
 
-  // Find all bag files
-  auto bag_files = find_bag_files(input_dir);
-  if (bag_files.empty()) {
-    RCLCPP_WARN(g_logger, "No bag files found in '%s'", input_dir.string().c_str());
+  // Find all bag files across all input directories
+  std::vector<fs::path> all_bag_files;
+  for (const auto & input_dir_str : config.input_dirs) {
+    auto bag_files = find_bag_files(fs::path(input_dir_str));
+    RCLCPP_INFO(g_logger, "Found %zu bag files in '%s'", bag_files.size(), input_dir_str.c_str());
+    all_bag_files.insert(all_bag_files.end(), bag_files.begin(), bag_files.end());
+  }
+
+  if (all_bag_files.empty()) {
+    RCLCPP_WARN(g_logger, "No bag files found in any input directory");
     return 0;
   }
 
-  RCLCPP_INFO(
-    g_logger, "Found %zu bag files in '%s'", bag_files.size(), input_dir.string().c_str());
+  RCLCPP_INFO(g_logger, "Total bag files found: %zu", all_bag_files.size());
 
   // Parse filenames and group
   std::map<MergeGroupKey, std::vector<fs::path>> groups;
@@ -384,7 +312,7 @@ int run_merge(const MergeConfig & config)
   std::map<MergeGroupKey, std::string> group_extensions;
   MergeResult result;
 
-  for (const auto & bag_path : bag_files) {
+  for (const auto & bag_path : all_bag_files) {
     std::string filename = bag_path.filename().string();
     auto parsed = parse_bag_filename(filename);
 
@@ -434,7 +362,7 @@ int run_merge(const MergeConfig & config)
       continue;
     }
 
-    RCLCPP_INFO(g_logger, "Merging group '%s' (%zu files)...", group_name.c_str(), files.size());
+    RCLCPP_INFO(g_logger, "Processing group '%s' (%zu files)...", group_name.c_str(), files.size());
     for (const auto & f : files) {
       RCLCPP_INFO(g_logger, "  - %s", f.filename().string().c_str());
     }
@@ -449,27 +377,36 @@ int run_merge(const MergeConfig & config)
       storage_identifier = reader.get_metadata().storage_identifier;
     }
 
-    int64_t msg_count = merge_group(files, output_path, storage_identifier);
+    int64_t msg_count;
+    if (processor) {
+      msg_count = processor(files, output_path, storage_identifier);
+    } else {
+      msg_count = merge_group(files, output_path, storage_identifier);
+    }
+
     if (msg_count < 0) {
-      RCLCPP_ERROR(g_logger, "Failed to merge group '%s'", group_name.c_str());
+      RCLCPP_ERROR(g_logger, "Failed to process group '%s'", group_name.c_str());
       ++result.failed_count;
       result.failed_groups.push_back(group_name);
       continue;
     }
 
-    RCLCPP_INFO(g_logger, "Merged %ld messages -> %s", msg_count, output_path.string().c_str());
+    RCLCPP_INFO(g_logger, "Processed %ld messages -> %s", msg_count, output_path.string().c_str());
     ++result.merged_count;
     result.total_messages += static_cast<size_t>(msg_count);
 
     // Delete source files if requested
-    if (config.delete_after_merge) {
+    if (config.delete_sources) {
       for (const auto & f : files) {
-        if (fs::remove(f, ec)) {
-          RCLCPP_INFO(g_logger, "  Deleted: %s", f.string().c_str());
-          ++result.deleted_files;
-        } else {
+        std::error_code del_ec;
+        fs::remove(f, del_ec);
+        if (del_ec) {
           RCLCPP_WARN(
-            g_logger, "  Failed to delete: %s (%s)", f.string().c_str(), ec.message().c_str());
+            g_logger, "Failed to delete source file '%s': %s", f.string().c_str(),
+            del_ec.message().c_str());
+        } else {
+          RCLCPP_INFO(g_logger, "  Deleted source: %s", f.filename().string().c_str());
+          ++result.deleted_files;
         }
       }
     }

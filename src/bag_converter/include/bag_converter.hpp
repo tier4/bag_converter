@@ -54,6 +54,9 @@ inline constexpr bool keep_original_topics = false;
 inline constexpr bool use_reflectance = false;
 inline constexpr int min_conf_level = 0;  // 0 = no filtering
 
+// Progress logging interval
+inline constexpr size_t progress_log_interval = 1000;
+
 // CDR header stamp extraction
 inline constexpr size_t cdr_header_min_size = 4 + 4 + 4;  // CDR header + sec + nanosec
 inline constexpr int64_t cdr_stamp_min_epoch_ns = 1'000'000'000LL * 1'000'000'000LL;  // ~2001-09-09
@@ -119,11 +122,15 @@ struct BagConverterConfig
   // Passthrough mode (process all messages even without decodable topics)
   bool passthrough = false;
 
-  // In-place mode (overwrite input bag)
-  bool inplace = false;
+  // Delete source files after successful conversion
+  bool delete_sources = false;
 
   // Batch mode
   bool batch_mode = false;
+
+  // Merge mode (merge + convert pipeline)
+  bool merge = false;
+  std::vector<std::string> input_dirs;
 };
 
 /**
@@ -154,19 +161,14 @@ std::string generate_output_topic(
 void print_summary(const std::map<std::string, BagConverterStats> & conversion_stats);
 
 /**
- * @brief Print top-level usage (subcommand listing)
+ * @brief Print usage information
  */
-void print_top_level_usage();
+void print_usage();
 
 /**
  * @brief Print version information
  */
 void print_version();
-
-/**
- * @brief Print usage information for the conv subcommand
- */
-void print_conv_usage();
 
 /**
  * @brief Parse command line arguments into BagConverterConfig
