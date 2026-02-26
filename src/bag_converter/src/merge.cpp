@@ -140,7 +140,7 @@ static std::optional<ParsedBagFilename> parse_bag_filename(const std::string & f
 /**
  * @brief Collect the union of all topics from multiple bag files
  * @param bag_files List of bag file paths
- * @return Map of topic name to TopicMetadata, or nullopt if conflicting types found
+ * @return Map of topic name to TopicMetadata, or nullopt if duplicate topics found across bags
  */
 static std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> collect_topic_union(
   const std::vector<fs::path> & bag_files)
@@ -160,15 +160,12 @@ static std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> coll
       auto it = topic_union.find(topic_meta.name);
 
       if (it != topic_union.end()) {
-        if (it->second.type != topic_meta.type) {
-          RCLCPP_ERROR(
-            g_logger, "Topic '%s' has conflicting types: '%s' vs '%s' across bags",
-            topic_meta.name.c_str(), it->second.type.c_str(), topic_meta.type.c_str());
-          return std::nullopt;
-        }
-      } else {
-        topic_union[topic_meta.name] = topic_meta;
+        RCLCPP_ERROR(
+          g_logger, "Duplicate topic '%s' found across bags (in '%s'). Skipping group.",
+          topic_meta.name.c_str(), bag_path.filename().string().c_str());
+        return std::nullopt;
       }
+      topic_union[topic_meta.name] = topic_meta;
     }
   }
 
