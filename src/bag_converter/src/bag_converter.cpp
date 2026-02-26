@@ -114,6 +114,7 @@ void print_usage(const char * program_name)
   std::cout
     << "Usage: " << program_name << " <input_bag> <output_bag> [options]\n"
     << "       " << program_name << " <input_dir> <output_dir> [options]\n"
+    << "       " << program_name << " <input> --inplace [options]\n"
     << "\nUnified bag converter for Seyond LiDAR topics.\n"
     << "Automatically detects and converts both NebulaPackets and SeyondScan messages.\n"
     << "\nSupported input formats:\n"
@@ -151,6 +152,9 @@ void print_usage(const char * program_name)
     << "  --passthrough             Process all messages even without decodable topics.\n"
     << "                            Useful with --use-header-stamp-as-log-time to rewrite\n"
     << "                            log_time for bags without LiDAR packet topics.\n"
+    << "  --inplace                 Modify the input bag in-place. No output path needed.\n"
+    << "                            The original file is preserved until processing\n"
+    << "                            completes successfully.\n"
     << "  -h, --help                Show this help message\n"
     << "  -v, --version             Show version information\n";
 }
@@ -174,20 +178,39 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
     }
   }
 
-  if (argc < 3) {
-    print_usage(argv[0]);
-    return 1;  // Error: missing arguments
+  // Pre-scan for --inplace to determine argument layout
+  for (int i = 1; i < argc; i++) {
+    if (std::string(argv[i]) == "--inplace") {
+      config.inplace = true;
+      break;
+    }
   }
 
-  config.src_bag_path = argv[1];
-  config.dst_bag_path = argv[2];
+  int options_start;
+  if (config.inplace) {
+    if (argc < 2) {
+      print_usage(argv[0]);
+      return 1;
+    }
+    config.src_bag_path = argv[1];
+    config.dst_bag_path = argv[1];
+    options_start = 2;
+  } else {
+    if (argc < 3) {
+      print_usage(argv[0]);
+      return 1;  // Error: missing arguments
+    }
+    config.src_bag_path = argv[1];
+    config.dst_bag_path = argv[2];
+    options_start = 3;
+  }
 
   // Auto-detect batch mode if input path is a directory
   if (fs::is_directory(config.src_bag_path)) {
     config.batch_mode = true;
   }
 
-  for (int i = 3; i < argc; i++) {
+  for (int i = options_start; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--keep-original") {
       config.keep_original_topics = true;
@@ -252,6 +275,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       config.use_header_stamp_as_log_time = true;
     } else if (arg == "--passthrough") {
       config.passthrough = true;
+    } else if (arg == "--inplace") {
+      // Already processed in pre-scan
     } else {
       std::cerr << "Error: Unknown option '" << arg << "'.\n";
       print_usage(argv[0]);
@@ -368,8 +393,10 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
 
   const fs::path dst_path(config.dst_bag_path);
 
-  // Check if input and output paths refer to the same file
-  if (fs::exists(dst_path) && fs::canonical(config.src_bag_path) == fs::canonical(dst_path)) {
+  // Check if input and output paths refer to the same file (allowed in inplace mode)
+  if (
+    !config.inplace && fs::exists(dst_path) &&
+    fs::canonical(config.src_bag_path) == fs::canonical(dst_path)) {
     RCLCPP_ERROR(
       g_logger, "Input and output bag paths must not be the same: %s", config.src_bag_path.c_str());
     return BagConverterResultStatus::kError;
@@ -383,8 +410,8 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     fs::create_directories(dst_path.parent_path());
   }
 
-  // Remove existing output file if present
-  if (fs::exists(dst_path)) {
+  // Remove existing output file if present (skip in inplace mode to preserve input)
+  if (!config.inplace && fs::exists(dst_path)) {
     RCLCPP_INFO(g_logger, "Removing existing output file: %s", dst_path.c_str());
     fs::remove(dst_path);
   }
@@ -760,28 +787,30 @@ int run_batch(const BagConverterConfig & config)
     return 1;
   }
 
-  // Check input != output
-  std::error_code ec;
-  const auto input_canonical = fs::canonical(input_dir, ec);
-  if (!ec && fs::exists(output_dir)) {
-    const auto output_canonical = fs::canonical(output_dir, ec);
-    if (!ec && input_canonical == output_canonical) {
-      RCLCPP_ERROR(
-        g_logger, "Input and output directories must not be the same: %s", input_dir.c_str());
-      return 1;
+  // Check input != output (allowed in inplace mode)
+  if (!config.inplace) {
+    std::error_code ec;
+    const auto input_canonical = fs::canonical(input_dir, ec);
+    if (!ec && fs::exists(output_dir)) {
+      const auto output_canonical = fs::canonical(output_dir, ec);
+      if (!ec && input_canonical == output_canonical) {
+        RCLCPP_ERROR(
+          g_logger, "Input and output directories must not be the same: %s", input_dir.c_str());
+        return 1;
+      }
     }
-  }
 
-  // Create output directory if needed
-  if (!fs::exists(output_dir)) {
-    RCLCPP_INFO(g_logger, "Creating output directory: %s", output_dir.c_str());
-    std::error_code create_ec;
-    fs::create_directories(output_dir, create_ec);
-    if (create_ec) {
-      RCLCPP_ERROR(
-        g_logger, "Failed to create output directory %s: %s", output_dir.c_str(),
-        create_ec.message().c_str());
-      return 1;
+    // Create output directory if needed
+    if (!fs::exists(output_dir)) {
+      RCLCPP_INFO(g_logger, "Creating output directory: %s", output_dir.c_str());
+      std::error_code create_ec;
+      fs::create_directories(output_dir, create_ec);
+      if (create_ec) {
+        RCLCPP_ERROR(
+          g_logger, "Failed to create output directory %s: %s", output_dir.c_str(),
+          create_ec.message().c_str());
+        return 1;
+      }
     }
   }
 
