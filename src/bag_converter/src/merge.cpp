@@ -160,12 +160,15 @@ static std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> coll
       auto it = topic_union.find(topic_meta.name);
 
       if (it != topic_union.end()) {
-        RCLCPP_ERROR(
-          g_logger, "Duplicate topic '%s' found across bags (in '%s'). Skipping group.",
-          topic_meta.name.c_str(), bag_path.filename().string().c_str());
-        return std::nullopt;
+        if (it->second.type != topic_meta.type) {
+          RCLCPP_ERROR(
+            g_logger, "Topic '%s' has conflicting types: '%s' vs '%s' across bags. Skipping group.",
+            topic_meta.name.c_str(), it->second.type.c_str(), topic_meta.type.c_str());
+          return std::nullopt;
+        }
+      } else {
+        topic_union[topic_meta.name] = topic_meta;
       }
-      topic_union[topic_meta.name] = topic_meta;
     }
   }
 
