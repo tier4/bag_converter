@@ -93,17 +93,8 @@ In both modes, TF data is pre-loaded from the bag before processing begins, so t
 # Transform point clouds to base_link frame (static TF, default)
 ./bag_converter input.mcap output.mcap --base-frame base_link
 
-# Transform with dynamic (time-dependent) TF
-./bag_converter input.mcap output.mcap --base-frame base_link --tf-mode dynamic
-
-# Filter Seyond packets with low confidence level
-./bag_converter input.mcap output.mcap --min-conf-level 2
-
 # In-place conversion (overwrites input bag)
 ./bag_converter input.mcap --inplace
-
-# In-place with log_time rewrite
-./bag_converter input.mcap --inplace --passthrough --use-header-stamp-as-log-time
 ```
 
 ## Message Types
