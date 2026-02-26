@@ -41,40 +41,19 @@ cd docker
 ## Usage
 
 ```shell
-./bag_converter <command> [options]
-```
-
-| Command | Description                                                 |
-| ------- | ----------------------------------------------------------- |
-| `conv`  | Convert rosbag2 files (decode LiDAR packets to PointCloud2) |
-| `merge` | Merge rosbag2 files from distributed log modules            |
-
-| Option            | Description       |
-| ----------------- | ----------------- |
-| `--help`, `-h`    | Show help message |
-| `--version`, `-v` | Show version      |
-
-Run `./bag_converter <command> --help` for more information on a command.
-
-## Commands
-
-### conv
-
-Convert rosbag2 files containing LiDAR packet messages to PointCloud2 messages.
-
-```shell
-./bag_converter conv <input_bag> <output_bag> [options]
-./bag_converter conv <input_dir> <output_dir> [options]
-./bag_converter conv <input> --inplace [options]
+./bag_converter <input_bag> <output_bag> [options]
+./bag_converter <input_dir> <output_dir> [options]
+./bag_converter <input_dir_0> [input_dir_1 ...] <output_dir> --merge [options]
 ```
 
 If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in it are automatically converted. The directory structure is mirrored in the output, and output filenames match the input filenames. All options are applied to every file. If a file fails to convert, the error is logged and processing continues with the remaining files.
 
-#### Options
+### Options
 
 | Option                           | Description                                                                                                                                                                                     |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--help`, `-h`                   | Show help message                                                                                                                                                                               |
+| `--version`, `-v`                | Show version                                                                                                                                                                                    |
 | `--point-type <type>`            | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit` (en_xyzit includes refl_type)                                                                                                       |
 | `--keep-original`                | Keep original packet topics in output bag                                                                                                                                                       |
 | `--base-frame <frame>`           | Transform PointCloud2 to the specified TF frame                                                                                                                                                 |
@@ -82,7 +61,8 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 | `--min-conf-level <0-3>`         | **[Experimental]** Minimum packet confidence level (default: `0`, no filtering). Only effective for SeyondScan with Falcon LiDAR.                                                               |
 | `--use-header-stamp-as-log-time` | Override mcap log_time with `header.stamp` for all messages that contain a `std_msgs/msg/Header`. Messages without a valid header (e.g. `tf2_msgs/msg/TFMessage`) keep their original log_time. |
 | `--passthrough`                  | Process all messages even without decodable LiDAR packet topics. Useful with `--use-header-stamp-as-log-time` to rewrite log_time for bags that do not contain LiDAR packet topics.             |
-| `--inplace`                      | Modify the input bag in-place (no output path needed). The original file is preserved until processing completes successfully.                                                                  |
+| `--merge`                        | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory.                            |
+| `--delete`                       | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.                                 |
 
 The `--base-frame` option transforms all output PointCloud2 messages to the specified coordinate frame using TF data (`tf2_msgs/msg/TFMessage`) from the input bag. The `--tf-mode` option controls how TF data is handled:
 
@@ -91,42 +71,9 @@ The `--base-frame` option transforms all output PointCloud2 messages to the spec
 
 In both modes, TF data is pre-loaded from the bag before processing begins, so transforms are always available even if TF messages appear after point cloud messages in the bag. The conversion fails if the specified frame is not found or if any point cloud cannot be transformed.
 
-#### Examples
+### Merge mode
 
-```shell
-# Basic conversion
-./bag_converter conv input.mcap output.mcap
-
-# Show help
-./bag_converter --help
-./bag_converter conv --help
-
-# Specify output point type (xyzi without timestamp field)
-./bag_converter conv input.mcap output.mcap --point-type xyzi
-
-# Keep original packet topics in output
-./bag_converter conv input.mcap output.mcap --keep-original
-
-# Convert all bag files in a directory (batch mode)
-./bag_converter conv /path/to/input_dir /path/to/output_dir
-
-# Batch mode with options
-./bag_converter conv /path/to/input_dir /path/to/output_dir --point-type xyzi
-
-# Transform point clouds to base_link frame (static TF, default)
-./bag_converter conv input.mcap output.mcap --base-frame base_link
-
-# In-place conversion (overwrites input bag)
-./bag_converter conv input.mcap --inplace
-```
-
-### merge
-
-Merge multiple rosbag2 files from distributed log modules into single files.
-
-```shell
-./bag_converter merge <input_dir> <output_dir> [options]
-```
+When `--merge` is specified, the tool merges and converts bag files from one or more input directories in a single pass. For each merge group, messages from all input bags are k-way merged in timestamp order while simultaneously decoding LiDAR packet topics to PointCloud2.
 
 Input files must follow the naming pattern:
 
@@ -140,23 +87,46 @@ Input files must follow the naming pattern:
 
 Files with the same `sensing_system_id` and `rest` are grouped and merged into a single output bag. The output filename drops `module_id`: `<sensing_system_id>_<rest>.<ext>`. Messages are interleaved in timestamp order. Files that do not match the pattern or groups with only a single file are skipped.
 
-The tool searches `input_dir` recursively. All merged files are saved flat into `output_dir`.
+All conversion options (e.g., `--point-type`, `--base-frame`, `--passthrough`) are applied during the merge. Use `--delete` to remove the original input bag files after each group is successfully processed.
 
-#### Options
-
-| Option         | Description                                |
-| -------------- | ------------------------------------------ |
-| `--help`, `-h` | Show help message                          |
-| `--delete`     | Delete source files after successful merge |
-
-#### Examples
+### Examples
 
 ```shell
-# Merge bags from distributed log modules
-./bag_converter merge /path/to/input_dir /path/to/output_dir
+# Basic conversion
+./bag_converter input.mcap output.mcap
 
-# Merge and delete source files after successful merge
-./bag_converter merge /path/to/input_dir /path/to/output_dir --delete
+# Show help
+./bag_converter --help
+
+# Specify output point type (xyzi without timestamp field)
+./bag_converter input.mcap output.mcap --point-type xyzi
+
+# Keep original packet topics in output
+./bag_converter input.mcap output.mcap --keep-original
+
+# Convert all bag files in a directory (batch mode)
+./bag_converter /path/to/input_dir /path/to/output_dir
+
+# Batch mode with options
+./bag_converter /path/to/input_dir /path/to/output_dir --point-type xyzi
+
+# Transform point clouds to base_link frame (static TF, default)
+./bag_converter input.mcap output.mcap --base-frame base_link
+
+# Convert and delete source file after success
+./bag_converter input.mcap output.mcap --delete
+
+# Merge + convert from multiple input directories
+./bag_converter /path/to/input_dir_0 /path/to/input_dir_1 /path/to/output_dir --merge
+
+# Merge + convert with options
+./bag_converter /path/to/input_dir /path/to/output_dir --merge --point-type xyzi
+
+# Merge + convert with log_time rewriting (useful even without LiDAR topics)
+./bag_converter /path/to/input_dir /path/to/output_dir --merge --passthrough --use-header-stamp-as-log-time
+
+# Merge + convert and delete original input files
+./bag_converter /path/to/input_dir /path/to/output_dir --merge --delete
 ```
 
 ## Message Types

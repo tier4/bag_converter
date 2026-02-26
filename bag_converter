@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Docker image tag
 IMAGE_TAG="latest"
@@ -21,109 +21,129 @@ if [ -t 0 ]; then
     DOCKER_FLAGS="-it"
 fi
 
-# Merge subcommand: mount input/output directories
-if [ "$1" = "merge" ]; then
-    shift 1
-    if [ $# -ge 2 ] && [ "$1" != "--help" ] && [ "$1" != "-h" ]; then
-        INPUT_ABS=$(realpath "$1")
-        OUTPUT_ABS=$(realpath -m "$2")
-        shift 2
-
-        # Check if --delete is specified (need read-write mount for input)
-        HAS_DELETE=false
-        for arg in "$@"; do
-            if [ "$arg" = "--delete" ]; then
-                HAS_DELETE=true
-                break
-            fi
-        done
-
-        # Create output directory on host so Docker doesn't create it as root
-        mkdir -p "$OUTPUT_ABS"
-
-        if $HAS_DELETE; then
-            INPUT_MOUNT="$INPUT_ABS:/input"
-        else
-            INPUT_MOUNT="$INPUT_ABS:/input:ro"
-        fi
-
-        docker run $DOCKER_FLAGS --rm \
-            -v "$INPUT_MOUNT" \
-            -v "$OUTPUT_ABS":/output \
-            bag_converter:${IMAGE_TAG} \
-            ros2 run bag_converter bag_converter merge /input /output "$@"
-    else
-        # Not enough args or --help: pass to binary
-        docker run $DOCKER_FLAGS --rm \
-            bag_converter:${IMAGE_TAG} \
-            ros2 run bag_converter bag_converter merge "$@"
-    fi
-    exit $?
+# Detect deprecated subcommand usage
+if [ "${1:-}" = "conv" ] || [ "${1:-}" = "merge" ]; then
+    echo "Error: Subcommands 'conv' and 'merge' have been removed."
+    echo ""
+    echo "New usage:"
+    echo "  bag_converter <input_bag> <output_bag> [options]"
+    echo "  bag_converter <input_dir_0> [input_dir_1 ...] <output_dir> --merge [options]"
+    echo ""
+    echo "Run 'bag_converter --help' for details."
+    exit 1
 fi
 
-# Subcommand dispatch: require "conv" as first argument for mount handling
-if [ "$1" != "conv" ]; then
-    # No subcommand (or --help/--version/unknown): pass all args directly to the binary
+# If no positional args or just --help/--version, pass directly to binary
+if [ $# -eq 0 ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--version" ] || [ "${1:-}" = "-v" ]; then
     docker run $DOCKER_FLAGS --rm \
         bag_converter:${IMAGE_TAG} \
         ros2 run bag_converter bag_converter "$@"
     exit $?
 fi
 
-# Strip "conv" subcommand — remaining args are <input> [<output>] [options]
-shift 1
-
-# Check if --inplace is specified
-HAS_INPLACE=false
+# --- Detect flags ---
+HAS_MERGE=false
+HAS_DELETE=false
 for arg in "$@"; do
-    if [ "$arg" = "--inplace" ]; then
-        HAS_INPLACE=true
-        break
+    case "$arg" in
+    --merge) HAS_MERGE=true ;;
+    --delete) HAS_DELETE=true ;;
+    esac
+done
+
+# Helper: list of options that take a value argument
+option_takes_value() {
+    case "$1" in
+    --min-range | --max-range | --point-type | --timescale-correction | --timescale-correction-ref | --min-conf-level | --base-frame | --tf-mode)
+        return 0
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+# --- Separate positional args from option args ---
+POSITIONAL=()
+OPTIONS=()
+skip_next=false
+for arg in "$@"; do
+    if $skip_next; then
+        OPTIONS+=("$arg")
+        skip_next=false
+        continue
+    fi
+    if [[ $arg == -* ]]; then
+        OPTIONS+=("$arg")
+        if option_takes_value "$arg"; then
+            skip_next=true
+        fi
+    else
+        POSITIONAL+=("$arg")
     fi
 done
 
-# Inplace directory mode
-if $HAS_INPLACE && [ $# -ge 2 ] && [ -d "$1" ]; then
-    INPUT_ABS=$(realpath "$1")
-    shift 1
+# --- Merge mode ---
+if $HAS_MERGE; then
+    if [ ${#POSITIONAL[@]} -lt 2 ]; then
+        echo "Error: --merge requires at least one input directory and one output directory."
+        exit 1
+    fi
+
+    # Last positional = output dir, rest = input dirs
+    last_idx=$((${#POSITIONAL[@]} - 1))
+    OUTPUT_ABS=$(realpath -m "${POSITIONAL[$last_idx]}")
+    mkdir -p "$OUTPUT_ABS"
+
+    # Mount input dirs as rw if --delete, ro otherwise
+    INPUT_MOUNT_MODE="ro"
+    if $HAS_DELETE; then
+        INPUT_MOUNT_MODE="rw"
+    fi
+
+    DOCKER_VOLUMES=(-v "$OUTPUT_ABS":/output)
+    CONTAINER_ARGS=()
+
+    for ((i = 0; i < last_idx; i++)); do
+        INPUT_ABS=$(realpath "${POSITIONAL[$i]}")
+        DOCKER_VOLUMES+=(-v "$INPUT_ABS:/input/$i:$INPUT_MOUNT_MODE")
+        CONTAINER_ARGS+=("/input/$i")
+    done
+    CONTAINER_ARGS+=(/output)
 
     docker run $DOCKER_FLAGS --rm \
-        -v "$INPUT_ABS":/data \
+        "${DOCKER_VOLUMES[@]}" \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter conv /data "$@"
+        ros2 run bag_converter bag_converter "${CONTAINER_ARGS[@]}" "${OPTIONS[@]}"
+    exit $?
+fi
 
-# Inplace single file mode
-elif $HAS_INPLACE && [ $# -ge 2 ]; then
-    INPUT_ABS=$(realpath "$1" 2>/dev/null || echo "$1")
-    INPUT_DIR=$(dirname "$INPUT_ABS")
-    INPUT_FILE=$(basename "$INPUT_ABS")
-    shift 1
-
-    docker run $DOCKER_FLAGS --rm \
-        -v "$INPUT_DIR":/data \
-        -e INPUT_FILE="$INPUT_FILE" \
-        bag_converter:${IMAGE_TAG} \
-        sh -c 'ros2 run bag_converter bag_converter conv "/data/$INPUT_FILE" "$@"' -- "$@"
-
-# Directory mode: mount input/output as directories
-elif [ $# -ge 2 ] && [ -d "$1" ]; then
-    INPUT_ABS=$(realpath "$1")
-    OUTPUT_ABS=$(realpath -m "$2")
-    shift 2
+# --- Directory mode ---
+if [ ${#POSITIONAL[@]} -ge 2 ] && [ -d "${POSITIONAL[0]}" ]; then
+    INPUT_ABS=$(realpath "${POSITIONAL[0]}")
+    OUTPUT_ABS=$(realpath -m "${POSITIONAL[1]}")
 
     # Create output directory on host so Docker doesn't create it as root
     mkdir -p "$OUTPUT_ABS"
 
+    # Mount input as rw if --delete, ro otherwise
+    INPUT_MOUNT_MODE="ro"
+    if $HAS_DELETE; then
+        INPUT_MOUNT_MODE="rw"
+    fi
+
     docker run $DOCKER_FLAGS --rm \
-        -v "$INPUT_ABS":/input:ro \
+        -v "$INPUT_ABS":/input:$INPUT_MOUNT_MODE \
         -v "$OUTPUT_ABS":/output \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter conv /input /output "$@"
+        ros2 run bag_converter bag_converter /input /output "${OPTIONS[@]}"
+    exit $?
+fi
 
-# Single file mode: mount input/output parent directories
-elif [ $# -ge 2 ]; then
-    INPUT_PATH="$1"
-    OUTPUT_PATH="$2"
+# --- Single file mode ---
+if [ ${#POSITIONAL[@]} -ge 2 ]; then
+    INPUT_PATH="${POSITIONAL[0]}"
+    OUTPUT_PATH="${POSITIONAL[1]}"
 
     # Get absolute paths (use -m for output to allow non-existent paths)
     INPUT_ABS=$(realpath "$INPUT_PATH" 2>/dev/null || echo "$INPUT_PATH")
@@ -135,21 +155,23 @@ elif [ $# -ge 2 ]; then
     INPUT_FILE=$(basename "$INPUT_ABS")
     OUTPUT_FILE=$(basename "$OUTPUT_ABS")
 
-    # Shift to get remaining arguments (options)
-    shift 2
+    # Mount input dir as rw if --delete, ro otherwise
+    INPUT_MOUNT_MODE="ro"
+    if $HAS_DELETE; then
+        INPUT_MOUNT_MODE="rw"
+    fi
 
-    # Run the bag converter using Docker with volume mounts
-    # Replace input and output paths with Docker container paths
     docker run $DOCKER_FLAGS --rm \
-        -v "$INPUT_DIR":/input \
+        -v "$INPUT_DIR":/input:$INPUT_MOUNT_MODE \
         -v "$OUTPUT_DIR":/output \
         -e INPUT_FILE="$INPUT_FILE" \
         -e OUTPUT_FILE="$OUTPUT_FILE" \
         bag_converter:${IMAGE_TAG} \
-        sh -c 'ros2 run bag_converter bag_converter conv "/input/$INPUT_FILE" "/output/$OUTPUT_FILE" "$@"' -- "$@"
-else
-    # Not enough args for conv — pass to binary to show conv help
-    docker run $DOCKER_FLAGS --rm \
-        bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter conv "$@"
+        sh -c 'ros2 run bag_converter bag_converter "/input/$INPUT_FILE" "/output/$OUTPUT_FILE" "$@"' -- "${OPTIONS[@]}"
+    exit $?
 fi
+
+# Fallback: not enough args — pass to binary to show usage
+docker run $DOCKER_FLAGS --rm \
+    bag_converter:${IMAGE_TAG} \
+    ros2 run bag_converter bag_converter "$@"
