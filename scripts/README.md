@@ -30,3 +30,18 @@ python3 scripts/decode_pointcloud2.py /path/to/bag.mcap
 # Show every 5000th point
 python3 scripts/decode_pointcloud2.py /path/to/bag.mcap --point-step 5000
 ```
+
+### plot_field_distribution.py
+
+Plot the value distribution of a PointCloud2 field across all topics in a rosbag.
+
+```bash
+# Plot intensity distribution
+python3 scripts/plot_field_distribution.py /path/to/bag.mcap intensity
+
+# Specify number of bins
+python3 scripts/plot_field_distribution.py /path/to/bag.mcap intensity --bins 100
+
+# Save to file
+python3 scripts/plot_field_distribution.py /path/to/bag.mcap intensity -o distribution.png
+```
