@@ -9,6 +9,8 @@ Topics that do not contain the field are skipped with a warning.
 
 import argparse
 import math
+import signal
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -127,6 +129,7 @@ def read_field_values(bag_path: str, field_name: str) -> dict[str, np.ndarray]:
 def plot_distribution(
     values_per_topic: dict[str, np.ndarray],
     field_name: str,
+    bag_name: str,
     bins: int = 50,
     output_path: str | None = None,
 ):
@@ -168,7 +171,8 @@ def plot_distribution(
         r, c = divmod(i, ncols)
         axes[r, c].set_visible(False)
 
-    fig.suptitle(f'Distribution of "{field_name}"', fontsize=14)
+    fig.suptitle(f'Distribution of "{field_name}"\n{bag_name}',
+                 fontsize=14)
     fig.canvas.manager.set_window_title(f'{field_name} distribution')
     fig.tight_layout()
 
@@ -206,11 +210,14 @@ Examples:
     if not Path(args.bag_path).exists():
         parser.error(f"Bag path does not exist: {args.bag_path}")
 
+    signal.signal(signal.SIGINT, lambda *_: sys.exit(130))
+
     rclpy.init()
     try:
         values = read_field_values(args.bag_path, args.field)
-        plot_distribution(values, args.field, bins=args.bins,
-                          output_path=args.output)
+        bag_name = Path(args.bag_path).name
+        plot_distribution(values, args.field, bag_name=bag_name,
+                          bins=args.bins, output_path=args.output)
     finally:
         try:
             rclpy.shutdown()
