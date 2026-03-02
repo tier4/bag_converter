@@ -185,27 +185,6 @@ Or, using the deprecated `t_us` field:
 absolute_timestamp_ns = (header.stamp.sec * 1,000,000,000 + header.stamp.nanosec) + (t_us * 1,000)
 ```
 
-## Parsing PointCloud2 Messages
+## Utility Scripts
 
-The repository includes a Python script `scripts/decode_pointcloud2.py` that demonstrates how to parse PointCloud2 messages from rosbag2 files.
-
-### Basic Usage
-
-```shell
-# Decode all PointCloud2 topics in a bag file
-python scripts/decode_pointcloud2.py <path-to-bag>
-
-# Show every 500th point per scan (default: 10000)
-python scripts/decode_pointcloud2.py <path-to-bag> --point-step 500
-
-# Add delay between messages (in seconds)
-python scripts/decode_pointcloud2.py <path-to-bag> --delay 0.1
-```
-
-### Example Output
-
-The following image shows example output from `decode_pointcloud2.py`:
-
-<img src="media/decode_pointcloud2_output.png" alt="decode_pointcloud2.py output" width="800">
-
-**Note:** The "Available fields" shown in the output are the fields embedded in the PointCloud2 message. The "stamp" value displayed for each point is calculated from `header.stamp` and `t_us` field, representing the absolute timestamp of that point.
+The `scripts/` directory contains Python scripts for inspecting and debugging rosbag files. See [scripts/README.md](scripts/README.md) for details.
