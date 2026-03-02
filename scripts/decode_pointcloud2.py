@@ -90,7 +90,6 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, point_step: int = 
         # Dictionary: topic_name -> list of timestamps
         scan_timestamps_per_topic = {}  # topic -> list of scan timestamps in nanoseconds
         receive_timestamps_per_topic = {}  # topic -> list of receive timestamps in nanoseconds
-        t_us_ranges_per_topic = {}  # topic -> list of (max_t_us - min_t_us) per message
 
         try:
             # Read messages
@@ -113,7 +112,6 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, point_step: int = 
                 if topic not in scan_timestamps_per_topic:
                     scan_timestamps_per_topic[topic] = []
                     receive_timestamps_per_topic[topic] = []
-                    t_us_ranges_per_topic[topic] = []
 
                 # Store timestamps for interval calculation
                 # Scan time: convert from sec + nanosec to nanoseconds
@@ -139,11 +137,6 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, point_step: int = 
                     base_time_us = None
                     if 't_us' in points and len(points['t_us']) > 0:
                         base_time_us = msg.header.stamp.sec * 1_000_000 + msg.header.stamp.nanosec // 1_000
-                        # Calculate t_us range (max - min) for this message
-                        t_us_min = np.min(points['t_us'])
-                        t_us_max = np.max(points['t_us'])
-                        t_us_range = t_us_max - t_us_min
-                        t_us_ranges_per_topic[topic].append(t_us_range)
 
                     # Convert timestamp from nanoseconds to seconds and nanoseconds
                     received_sec = timestamp // 1_000_000_000
@@ -231,15 +224,6 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, point_step: int = 
                     print(f"    Maximum: {np.max(receive_intervals):.9f} seconds ({np.max(receive_intervals)*1000:.6f} ms)")
                     print(f"    Average: {np.mean(receive_intervals):.9f} seconds ({np.mean(receive_intervals)*1000:.6f} ms)")
                     print(f"    Std Dev: {np.std(receive_intervals):.9f} seconds ({np.std(receive_intervals)*1000:.6f} ms)")
-
-                    # t_us range statistics (if available)
-                    if topic in t_us_ranges_per_topic and len(t_us_ranges_per_topic[topic]) > 0:
-                        t_us_ranges = np.array(t_us_ranges_per_topic[topic])
-                        print(f"  t_us Range per Message (max - min):")
-                        print(f"    Minimum: {np.min(t_us_ranges):.0f} us ({np.min(t_us_ranges)/1000:.3f} ms)")
-                        print(f"    Maximum: {np.max(t_us_ranges):.0f} us ({np.max(t_us_ranges)/1000:.3f} ms)")
-                        print(f"    Average: {np.mean(t_us_ranges):.0f} us ({np.mean(t_us_ranges)/1000:.3f} ms)")
-                        print(f"    Std Dev: {np.std(t_us_ranges):.0f} us ({np.std(t_us_ranges)/1000:.3f} ms)")
 
                 print("="*60)
         except KeyboardInterrupt:
