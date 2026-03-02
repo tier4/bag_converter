@@ -400,7 +400,6 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
       decoder::seyond::SeyondPCDDecoderConfig decoder_config;
       decoder_config.min_range = config.min_range;
       decoder_config.max_range = config.max_range;
-      decoder_config.use_reflectance = config.use_reflectance;
       decoder_config.min_conf_level = config.min_conf_level;
 
       auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
