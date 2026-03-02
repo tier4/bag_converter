@@ -354,12 +354,8 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
     fs::path output_path = output_dir / output_filename;
 
     if (fs::exists(output_path)) {
-      RCLCPP_ERROR(
-        g_logger, "Output file already exists, skipping group '%s': %s", group_name.c_str(),
-        output_path.string().c_str());
-      ++result.failed_count;
-      result.failed_groups.push_back(group_name);
-      continue;
+      RCLCPP_INFO(g_logger, "Removing existing output file: %s", output_path.string().c_str());
+      fs::remove(output_path);
     }
 
     RCLCPP_INFO(g_logger, "Processing group '%s' (%zu files)...", group_name.c_str(), files.size());
