@@ -171,13 +171,11 @@ void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
   if (CHECK_EN_XYZ_POINTCLOUD_DATA(pkt->type)) {
     const InnoEnXyzPoint * pt = reinterpret_cast<const InnoEnXyzPoint *>(
       reinterpret_cast<const char *>(pkt) + sizeof(InnoDataPacket));
-    point_xyz_data_parse<const InnoEnXyzPoint *>(
-      config_.use_reflectance && pkt->use_reflectance, pkt->item_number, pt, cloud);
+    point_xyz_data_parse<const InnoEnXyzPoint *>(pkt->use_reflectance, pkt->item_number, pt, cloud);
   } else if (CHECK_XYZ_POINTCLOUD_DATA(pkt->type)) {
     const InnoXyzPoint * pt = reinterpret_cast<const InnoXyzPoint *>(
       reinterpret_cast<const char *>(pkt) + sizeof(InnoDataPacket));
-    point_xyz_data_parse<const InnoXyzPoint *>(
-      config_.use_reflectance && pkt->use_reflectance, pkt->item_number, pt, cloud);
+    point_xyz_data_parse<const InnoXyzPoint *>(pkt->use_reflectance, pkt->item_number, pt, cloud);
   } else {
     RCLCPP_ERROR(
       rclcpp::get_logger("bag_converter.decoder.seyond"), "Packet type %d is not supported",
