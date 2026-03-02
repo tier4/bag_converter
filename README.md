@@ -195,9 +195,6 @@ The repository includes a Python script `scripts/decode_pointcloud2.py` that dem
 # Decode all PointCloud2 topics in a bag file
 python scripts/decode_pointcloud2.py <path-to-bag>
 
-# Decode a specific topic
-python scripts/decode_pointcloud2.py <path-to-bag> --topic /sensing/lidar/front/nebula_points
-
 # Show every 500th point per scan (default: 10000)
 python scripts/decode_pointcloud2.py <path-to-bag> --point-step 500
 

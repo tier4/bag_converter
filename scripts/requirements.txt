@@ -1,0 +1,6 @@
+numpy>=1.24
+rosbag2-py
+rclpy
+sensor-msgs
+rosidl-runtime-py
+sensor-msgs-py

@@ -21,6 +21,10 @@ log/
 # Private docs
 .docs/
 
+# Python
+.python-version
+.venv/
+
 # rosbags
 *.mcap
 *.db
