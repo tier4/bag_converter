@@ -23,13 +23,12 @@ from sensor_msgs_py import point_cloud2 as pc2
 import rosbag2_py
 
 
-def decode_pointcloud2(bag_path: str, topic_name: str = None, point_step: int = 10000, delay: float | None = None):
+def decode_pointcloud2(bag_path: str, point_step: int = 10000, delay: float | None = None):
     """
     Decode PointCloud2 messages from a rosbag2 file.
 
     Args:
         bag_path: Path to the rosbag2 directory or file
-        topic_name: Optional topic name to filter. If None, reads all PointCloud2 topics.
         point_step: Step size for displaying points (e.g., 1000 means show every 1000th point)
         delay: Delay between messages in seconds (default: None, no delay)
     """
@@ -67,19 +66,7 @@ def decode_pointcloud2(bag_path: str, topic_name: str = None, point_step: int = 
         for topic in pc2_topics.keys():
             print(f"  - {topic}")
 
-        # Select topic to read
-        if topic_name:
-            if topic_name not in pc2_topics:
-                print(f"Error: Topic '{topic_name}' not found in bag file.")
-                return
-            selected_topics = {topic_name}
-        else:
-            selected_topics = set(pc2_topics.keys())
-
-        # Set topic filter if needed
-        if len(selected_topics) < len(pc2_topics):
-            storage_filter = rosbag2_py.StorageFilter(topics=list(selected_topics))
-            reader.set_filter(storage_filter)
+        selected_topics = set(pc2_topics.keys())
 
         # Get message type
         msg_type = get_message('sensor_msgs/msg/PointCloud2')
@@ -341,7 +328,7 @@ def main():
         epilog="""
 Examples:
   %(prog)s /path/to/bag
-  %(prog)s /path/to/bag --topic /sensing/lidar/top/nebula_points
+  %(prog)s /path/to/bag --point-step 5000
         """
     )
 
@@ -349,13 +336,6 @@ Examples:
         'bag_path',
         type=str,
         help='Path to the rosbag2 directory or file'
-    )
-
-    parser.add_argument(
-        '--topic',
-        type=str,
-        default=None,
-        help='Optional topic name to filter. If not specified, reads all PointCloud2 topics.'
     )
 
     parser.add_argument(
@@ -377,7 +357,6 @@ Examples:
     args = parser.parse_args()
 
     bag_path = args.bag_path
-    topic_name = args.topic
     point_step = args.point_step
     delay = args.delay
 
@@ -390,7 +369,7 @@ Examples:
     if delay is not None and delay < 0:
         parser.error("--delay must be non-negative")
 
-    decode_pointcloud2(bag_path, topic_name, point_step, delay)
+    decode_pointcloud2(bag_path, point_step, delay)
 
 
 if __name__ == '__main__':
