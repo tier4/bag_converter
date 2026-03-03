@@ -50,19 +50,16 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 
 ### Options
 
-| Option                           | Description                                                                                                                                                                                                                  |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--help`, `-h`                   | Show help message                                                                                                                                                                                                            |
-| `--version`, `-v`                | Show version                                                                                                                                                                                                                 |
-| `--point-type <type>`            | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit`. The `en_xyzit` type adds extended fields (refl_type, elongation, lidar_status, lidar_mode, and packet version); see [Output: PointCloud2](#output-pointcloud2). |
-| `--keep-original`                | Keep original packet topics in output bag                                                                                                                                                                                    |
-| `--base-frame <frame>`           | Transform PointCloud2 to the specified TF frame                                                                                                                                                                              |
-| `--tf-mode <static\|dynamic>`    | TF mode: `static` (default) or `dynamic`                                                                                                                                                                                     |
-| `--min-conf-level <0-3>`         | **[Experimental]** Minimum packet confidence level (default: `0`, no filtering). Only effective for SeyondScan with Falcon LiDAR.                                                                                            |
-| `--use-header-stamp-as-log-time` | Override mcap log_time with `header.stamp` for all messages that contain a `std_msgs/msg/Header`. Messages without a valid header (e.g. `tf2_msgs/msg/TFMessage`) keep their original log_time.                              |
-| `--passthrough`                  | Process all messages even without decodable LiDAR packet topics. Useful with `--use-header-stamp-as-log-time` to rewrite log_time for bags that do not contain LiDAR packet topics.                                          |
-| `--merge`                        | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory.                                                         |
-| `--delete`                       | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.                                                              |
+| Option                        | Description                                                                                                                                                          |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--help`, `-h`                | Show help message                                                                                                                                                    |
+| `--version`, `-v`             | Show version                                                                                                                                                         |
+| `--point-type <type>`         | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit`. For `en_xyzit` layout and extended fields, see [docs/en_xyzit.md](docs/en_xyzit.md).                    |
+| `--keep-original`             | Keep original packet topics in output bag                                                                                                                            |
+| `--base-frame <frame>`        | Transform PointCloud2 to the specified TF frame                                                                                                                      |
+| `--tf-mode <static\|dynamic>` | TF mode: `static` (default) or `dynamic`                                                                                                                             |
+| `--merge`                     | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory. |
+| `--delete`                    | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.      |
 
 The `--base-frame` option transforms all output PointCloud2 messages to the specified coordinate frame using TF data (`tf2_msgs/msg/TFMessage`) from the input bag. The `--tf-mode` option controls how TF data is handled:
 
@@ -87,7 +84,7 @@ Input files must follow the naming pattern:
 
 Files with the same `sensing_system_id` and `rest` are grouped and merged into a single output bag. The output filename drops `module_id`: `<sensing_system_id>_<rest>.<ext>`. Messages are interleaved in timestamp order. Files that do not match the pattern or groups with only a single file are skipped.
 
-All conversion options (e.g., `--point-type`, `--base-frame`, `--passthrough`) are applied during the merge. Use `--delete` to remove the original input bag files after each group is successfully processed.
+All conversion options (e.g., `--point-type`, `--base-frame`) are applied during the merge. Use `--delete` to remove the original input bag files after each group is successfully processed.
 
 ### Examples
 
@@ -122,9 +119,6 @@ All conversion options (e.g., `--point-type`, `--base-frame`, `--passthrough`) a
 # Merge + convert with options
 ./bag_converter /path/to/input_dir /path/to/output_dir --merge --point-type xyzi
 
-# Merge + convert with log_time rewriting (useful even without LiDAR topics)
-./bag_converter /path/to/input_dir /path/to/output_dir --merge --passthrough --use-header-stamp-as-log-time
-
 # Merge + convert and delete original input files
 ./bag_converter /path/to/input_dir /path/to/output_dir --merge --delete
 ```
@@ -158,18 +152,7 @@ The output bag file contains `sensor_msgs::msg::PointCloud2` messages on topics 
 - `t_us` (uint32): **[DEPRECATED, will be removed in v0.6.0]** Replaced by `timestamp`. Relative timestamp in microseconds from the scan start time (xyzit, en_xyzit only)
 - `timestamp` (uint32): Relative timestamp in nanoseconds from the scan start time (xyzit, en_xyzit only)
 
-**Extended fields** (experimental; en_xyzit only; subject to change). Support depends on the input message type and decoder. For the `flags` mask, bit layout, and "value 0 when not supported" semantics, see [docs/flags.md](docs/flags.md).
-
-| Property            | Type   | SeyondScan | NebulaPackets | Description / values                                    |
-| ------------------- | ------ | ---------- | ------------- | ------------------------------------------------------- |
-| `flags`             | uint16 | ✓          | ✓             | Availability mask; see [flags.md](docs/flags.md)        |
-| `refl_type`         | uint8  | ✓          | —             | Point classification: 0 = normal, 1 = ground, 2 = fog   |
-| `elongation`        | uint8  | ✓          | —             | Raw elongation 0–15                                     |
-| `lidar_status`      | uint8  | ✓          | —             | 0 = none, 1 = transition, 2 = normal, 3 = failed        |
-| `lidar_mode`        | uint8  | ✓          | —             | 1 = sleep, 2 = standby, 3 = work_normal, 6 = protection |
-| `pkt_version_major` | uint8  | ✓          | ✓             | Packet protocol major (0–255)                           |
-| `pkt_version_minor` | uint8  | ✓          | ✓             | Packet protocol minor (0–255)                           |
-| `lidar_type`        | uint8  | ✓          | ✓             | Seyond LiDAR only. [Values](docs/lidar_type.md)         |
+**Extended fields** (en_xyzit only): availability mask, refl_type, elongation, lidar_status, lidar_mode, packet version, and lidar_type. Full layout, flag semantics, and value tables are in [docs/en_xyzit.md](docs/en_xyzit.md).
 
 #### Timestamps
 
