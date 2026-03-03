@@ -221,20 +221,32 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       point.timestamp = static_cast<uint32_t>((pkt_offset_us_ + point_ptr->ts_10us * 10) * 1000);
       point.t_us = point.timestamp / 1000;
     }
-    // refl_type: point classification (0: normal, 1: ground, 2: fog); -1 when not available
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
+      namespace fl = bag_converter::point::en_xyzit_flags;
+      point.flags = 0;
+      point.refl_type = 0;
+      point.elongation = 0;
+      point.lidar_status = 0;
+      point.lidar_mode = 0;
+      point.pkt_version_major = 0;
+      point.pkt_version_minor = 0;
+      point.lidar_type = 0;
+
       if constexpr (std::is_same<PointType, const InnoXyzPoint *>::value) {
-        point.refl_type = static_cast<int8_t>(point_ptr->type);
-        point.elongation = static_cast<int16_t>(point_ptr->elongation);
-      } else {
-        point.refl_type = -1;   // InnoEnXyzPoint has no type field
-        point.elongation = -1;  // InnoEnXyzPoint has no elongation field
+        point.refl_type = static_cast<uint8_t>(point_ptr->type);
+        point.elongation = static_cast<uint8_t>(point_ptr->elongation);
+        point.flags |= fl::HAS_REFL_TYPE | fl::HAS_ELONGATION;
       }
-      point.lidar_status = static_cast<int8_t>(pkt_lidar_status_);
-      point.lidar_mode = static_cast<int8_t>(pkt_lidar_mode_);
-      point.pkt_version_major = static_cast<int16_t>(pkt_version_major_);
-      point.pkt_version_minor = static_cast<int16_t>(pkt_version_minor_);
-      point.lidar_type = static_cast<int16_t>(pkt_lidar_type_);
+      point.lidar_status = static_cast<uint8_t>(pkt_lidar_status_);
+      point.lidar_mode = static_cast<uint8_t>(pkt_lidar_mode_);
+      point.flags |= fl::HAS_LIDAR_STATUS | fl::HAS_LIDAR_MODE;
+
+      point.pkt_version_major = pkt_version_major_;
+      point.pkt_version_minor = pkt_version_minor_;
+      point.flags |= fl::HAS_PKT_VERSION_MAJOR | fl::HAS_PKT_VERSION_MINOR;
+
+      point.lidar_type = pkt_lidar_type_;
+      point.flags |= fl::HAS_LIDAR_TYPE;
     }
 
     // Apply coordinate transformation (Autoware coordinate system)
