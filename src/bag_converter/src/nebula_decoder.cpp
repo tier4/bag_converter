@@ -17,9 +17,51 @@
 #include <iomanip>
 #include <iostream>
 #include <type_traits>
+#include <utility>
 
 namespace bag_converter::decoder::nebula
 {
+
+namespace
+{
+
+/// Metadata read from the first Seyond data packet (version + lidar_type).
+struct PacketMeta
+{
+  int16_t version_major = -1;
+  int16_t version_minor = -1;
+  int16_t lidar_type = -1;
+};
+
+/// Read packet version and lidar_type from the first Seyond data packet in \a packets.
+/// Layout matches nebula_drs: SeyondCommonVersion at 0-5, lidar_type in SeyondCommonHeader at 15.
+PacketMeta extract_packet_meta(const nebula_msgs::msg::NebulaPackets & packets)
+{
+  using ::nebula::drivers::seyond_packet::kSeyondMagicNumberDataPacket;
+  using ::nebula::drivers::seyond_packet::SeyondCommonVersion;
+  // SeyondCommonHeader: version(6) + checksum(4) + size(4) + source_id/timestamp_sync_type(1) +
+  // lidar_type(1) → lidar_type at offset 15
+  static constexpr size_t kLidarTypeOffset = 15;
+  for (const auto & packet : packets.packets) {
+    if (packet.data.size() < sizeof(SeyondCommonVersion)) {
+      continue;
+    }
+    const auto * common_version = reinterpret_cast<const SeyondCommonVersion *>(packet.data.data());
+    if (common_version->magic_number != kSeyondMagicNumberDataPacket) {
+      continue;
+    }
+    PacketMeta meta;
+    meta.version_major = static_cast<int16_t>(common_version->major_version);
+    meta.version_minor = static_cast<int16_t>(common_version->minor_version);
+    if (packet.data.size() > kLidarTypeOffset) {
+      meta.lidar_type = static_cast<int16_t>(packet.data[kLidarTypeOffset]);
+    }
+    return meta;
+  }
+  return {};
+}
+
+}  // anonymous namespace
 
 // NebulaPCDDecoder implementation
 template <typename OutputPointT>
@@ -86,6 +128,17 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
     return nullptr;
   }
 
+  // Packet version and lidar_type (experimental, en_xyzit only): from first Seyond data packet
+  int16_t pkt_version_major = -1;
+  int16_t pkt_version_minor = -1;
+  int16_t lidar_type = -1;
+  if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
+    const PacketMeta meta = extract_packet_meta(input);
+    pkt_version_major = meta.version_major;
+    pkt_version_minor = meta.version_minor;
+    lidar_type = meta.lidar_type;
+  }
+
   // Convert NebulaPointCloud to OutputPointT for PCL conversion
   pcl::PointCloud<OutputPointT> pc2_cloud;
   pc2_cloud.header = nebula_cloud->header;
@@ -105,6 +158,9 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
       pc2_pt.elongation = -1;  // Not available: NebulaPoint has no elongation
       pc2_pt.lidar_status = -1;  // Not available: NebulaPackets does not provide lidar status
       pc2_pt.lidar_mode = -1;    // Not available: NebulaPackets does not provide lidar mode
+      pc2_pt.pkt_version_major = pkt_version_major;
+      pc2_pt.pkt_version_minor = pkt_version_minor;
+      pc2_pt.lidar_type = lidar_type;
     }
     if constexpr (
       std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||

@@ -166,6 +166,11 @@ void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
   // Store per-packet LiDAR state for use in point_xyz_data_parse
   pkt_lidar_mode_ = pkt->common.lidar_mode;
   pkt_lidar_status_ = pkt->common.lidar_status;
+  if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
+    pkt_lidar_type_ = pkt->common.lidar_type;
+    pkt_version_major_ = pkt->common.version.major_version;
+    pkt_version_minor_ = pkt->common.version.minor_version;
+  }
 
   // Parse point data based on packet type (different lidars use different structures)
   if (CHECK_EN_XYZ_POINTCLOUD_DATA(pkt->type)) {
@@ -227,6 +232,9 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       }
       point.lidar_status = static_cast<int8_t>(pkt_lidar_status_);
       point.lidar_mode = static_cast<int8_t>(pkt_lidar_mode_);
+      point.pkt_version_major = static_cast<int16_t>(pkt_version_major_);
+      point.pkt_version_minor = static_cast<int16_t>(pkt_version_minor_);
+      point.lidar_type = static_cast<int16_t>(pkt_lidar_type_);
     }
 
     // Apply coordinate transformation (Autoware coordinate system)

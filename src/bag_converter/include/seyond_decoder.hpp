@@ -150,6 +150,11 @@ private:
   // Per-packet LiDAR state (from InnoCommonHeader)
   uint8_t pkt_lidar_mode_;    // enum InnoLidarMode
   uint8_t pkt_lidar_status_;  // enum InnoLidarStatus
+  uint8_t pkt_lidar_type_;    // enum InnoLidarType (for en_xyzit lidar_type)
+
+  // Per-packet version from InnoCommonVersion (experimental, en_xyzit only)
+  uint8_t pkt_version_major_;
+  uint8_t pkt_version_minor_;
 
   static constexpr double us_in_second_c = 1000000.0;
   static constexpr double ten_us_in_second_c = 100000.0;
