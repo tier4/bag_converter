@@ -591,11 +591,11 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     // Decode using polymorphic interface
     rclcpp::SerializedMessage serialized_msg(*bag_msg->serialized_data);
     auto & decoder = decoders[topic_name];
-    auto pointcloud_msg = decoder->decode(serialized_msg);
+    auto pcd_msg = decoder->decode(serialized_msg);
 
-    if (pointcloud_msg) {
+    if (pcd_msg) {
       // Skip status packets (messages with too few points)
-      const size_t num_points = pointcloud_msg->width * pointcloud_msg->height;
+      const size_t num_points = pcd_msg->width * pcd_msg->height;
       if (num_points < defaults::min_points_per_scan) {
         RCLCPP_INFO(g_logger, "Status packets detected (skipped decoding this message)");
         conversion_stats[topic_name].skipped_count++;
@@ -604,27 +604,27 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
 
       if (config.timescale_correction) {
         const std::uint64_t sensor_time_ns =
-          static_cast<std::uint64_t>(pointcloud_msg->header.stamp.sec) * 1000000000 +
-          static_cast<std::uint64_t>(pointcloud_msg->header.stamp.nanosec);
+          static_cast<std::uint64_t>(pcd_msg->header.stamp.sec) * 1000000000 +
+          static_cast<std::uint64_t>(pcd_msg->header.stamp.nanosec);
         const std::uint64_t sensor_time_ns_corrected = timescale::correct_timescale(
           sensor_time_ns, rclcpp::Time(bag_msg->time_stamp).nanoseconds(),
           config.timescale_correction_ref);
         if (sensor_time_ns_corrected != sensor_time_ns) {
-          pointcloud_msg->header.stamp.sec = sensor_time_ns_corrected / 1000000000;
-          pointcloud_msg->header.stamp.nanosec = sensor_time_ns_corrected % 1000000000;
+          pcd_msg->header.stamp.sec = sensor_time_ns_corrected / 1000000000;
+          pcd_msg->header.stamp.nanosec = sensor_time_ns_corrected % 1000000000;
         }
       }
 
       if (transformer) {
-        if (!transformer->transform(*pointcloud_msg, config.frame)) {
+        if (!transformer->transform(*pcd_msg, config.frame)) {
           RCLCPP_ERROR(
-            g_logger, "TF transform failed for frame: %s", pointcloud_msg->header.frame_id.c_str());
+            g_logger, "TF transform failed for frame: %s", pcd_msg->header.frame_id.c_str());
           return BagConverterResultStatus::kError;
         }
       }
 
       auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
-      pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
+      pc2_serializer.serialize_message(pcd_msg.get(), pc2_msg_serialized.get());
 
       const auto log_time = rclcpp::Time(bag_msg->time_stamp);
       writer.write(
