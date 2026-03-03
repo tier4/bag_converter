@@ -25,6 +25,13 @@ namespace bag_converter::point
 {
 
 /**
+ * Point types in this header are LiDAR-agnostic: they are not tied to a specific sensor.
+ * Depending on the LiDAR and packet format, some fields may be unavailable (e.g. packet
+ * version absent, or only major present). Use -1 for any field that cannot be obtained
+ * from the packet.
+ */
+
+/**
  * @brief Point type with XYZ coordinates and intensity
  *
  * This point type is used for point cloud conversion in bag files.
@@ -62,7 +69,10 @@ struct EIGEN_ALIGN16 PointXYZIT
 /**
  * @brief Extended point type: XYZ + intensity + timestamp + refl_type (packet type)
  *
- * Extended version of PointXYZIT with refl_type from the sensor packet.
+ * This extended type is experimental and may occasionally reflect features of specific
+ * LiDAR(s). As with all point types here, use -1 for any field that cannot be obtained
+ * from the packet (LiDAR-dependent).
+ *
  * It includes:
  * - x, y, z coordinates (float)
  * - intensity (float)
@@ -73,6 +83,12 @@ struct EIGEN_ALIGN16 PointXYZIT
  * - elongation: raw elongation value 0-15 when available; -1: not available (int16_t)
  * - lidar_status: LiDAR status (0: none, 1: transition, 2: normal, 3: failed; -1: not available)
  * - lidar_mode: LiDAR mode (1: sleep, 2: standby, 3: work_normal, 6: protection; -1: not available)
+ * - pkt_version_major: packet protocol major (0-255), or -1 when not provided (experimental,
+ *   en_xyzit only)
+ * - pkt_version_minor: packet protocol minor (0-255), or -1 when not provided (experimental,
+ *   en_xyzit only)
+ * - lidar_type: LiDAR type from packet (experimental, Seyond LiDAR only; -1 for other sensors or
+ *   when not provided)
  */
 struct EIGEN_ALIGN16 PointEnXYZIT
 {
@@ -84,6 +100,9 @@ struct EIGEN_ALIGN16 PointEnXYZIT
   int16_t elongation;
   int8_t lidar_status;
   int8_t lidar_mode;
+  int16_t pkt_version_major;  ///< Experimental, en_xyzit only. -1 when not provided.
+  int16_t pkt_version_minor;  ///< Experimental, en_xyzit only. -1 when not provided.
+  int16_t lidar_type;  ///< Experimental, Seyond LiDAR only. -1 when not provided or non-Seyond.
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -121,6 +140,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointEnXYZIT,
   (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
     uint32_t, timestamp, timestamp)(int8_t, refl_type, refl_type)(int16_t, elongation, elongation)(
-    int8_t, lidar_status, lidar_status)(int8_t, lidar_mode, lidar_mode))
+    int8_t, lidar_status,
+    lidar_status)(int8_t, lidar_mode, lidar_mode)(int16_t, pkt_version_major, pkt_version_major)(
+    int16_t, pkt_version_minor, pkt_version_minor)(int16_t, lidar_type, lidar_type))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP
