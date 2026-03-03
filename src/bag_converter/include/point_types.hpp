@@ -11,6 +11,8 @@
 
 #include <pcl/point_types.h>
 
+#include <cstdint>
+
 namespace bag_converter
 {
 
@@ -66,29 +68,29 @@ struct EIGEN_ALIGN16 PointXYZIT
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+/// Availability flags for PointEnXYZIT extended fields. When a bit is set, the corresponding
+/// value is valid; when clear, the value is 0 and must be ignored.
+namespace en_xyzit_flags
+{
+constexpr uint16_t HAS_REFL_TYPE = 1u << 0;
+constexpr uint16_t HAS_ELONGATION = 1u << 1;
+constexpr uint16_t HAS_LIDAR_STATUS = 1u << 2;
+constexpr uint16_t HAS_LIDAR_MODE = 1u << 3;
+constexpr uint16_t HAS_PKT_VERSION_MAJOR = 1u << 4;
+constexpr uint16_t HAS_PKT_VERSION_MINOR = 1u << 5;
+constexpr uint16_t HAS_LIDAR_TYPE = 1u << 6;
+}  // namespace en_xyzit_flags
+
 /**
- * @brief Extended point type: XYZ + intensity + timestamp + refl_type (packet type)
+ * @brief Extended point type: XYZ + intensity + timestamp + optional extended fields
  *
- * This extended type is experimental and may occasionally reflect features of specific
- * LiDAR(s). As with all point types here, use -1 for any field that cannot be obtained
- * from the packet (LiDAR-dependent).
+ * Experimental. Extended fields use an availability mask (flags) and minimal unsigned types.
+ * When a property is not supported, its flag bit is 0 and the value is 0 (must be ignored).
  *
- * It includes:
- * - x, y, z coordinates (float)
- * - intensity (float)
- * - t_us: [DEPRECATED, will be removed in v0.6.0] Replaced by `timestamp`.
- *         Relative timestamp from scan start in microseconds (uint32_t)
- * - timestamp: relative timestamp from scan start in nanoseconds (uint32_t)
- * - refl_type: point classification (0: normal, 1: ground, 2: fog; -1: not available; int8_t)
- * - elongation: raw elongation value 0-15 when available; -1: not available (int16_t)
- * - lidar_status: LiDAR status (0: none, 1: transition, 2: normal, 3: failed; -1: not available)
- * - lidar_mode: LiDAR mode (1: sleep, 2: standby, 3: work_normal, 6: protection; -1: not available)
- * - pkt_version_major: packet protocol major (0-255), or -1 when not provided (experimental,
- *   en_xyzit only)
- * - pkt_version_minor: packet protocol minor (0-255), or -1 when not provided (experimental,
- *   en_xyzit only)
- * - lidar_type: LiDAR type from packet (experimental, Seyond LiDAR only; -1 for other sensors or
- *   when not provided)
+ * Base: x, y, z (float), intensity (float), t_us (deprecated), timestamp (uint32_t).
+ * Extended (all uint8_t except flags): flags, refl_type (0-2), elongation (0-15),
+ * lidar_status (0-3), lidar_mode (0-9), pkt_version_major/minor (0-255), lidar_type (0-7).
+ * Value when not supported: 0.
  */
 struct EIGEN_ALIGN16 PointEnXYZIT
 {
@@ -96,13 +98,15 @@ struct EIGEN_ALIGN16 PointEnXYZIT
   float intensity;
   uint32_t t_us;  ///< @deprecated Will be removed in v0.6.0. Replaced by `timestamp`.
   uint32_t timestamp;
-  int8_t refl_type;
-  int16_t elongation;
-  int8_t lidar_status;
-  int8_t lidar_mode;
-  int16_t pkt_version_major;  ///< Experimental, en_xyzit only. -1 when not provided.
-  int16_t pkt_version_minor;  ///< Experimental, en_xyzit only. -1 when not provided.
-  int16_t lidar_type;  ///< Experimental, Seyond LiDAR only. -1 when not provided or non-Seyond.
+  uint16_t flags;        ///< en_xyzit_flags: which extended fields are valid
+  uint8_t refl_type;     ///< 0=normal, 1=ground, 2=fog. When not supported: 0.
+  uint8_t elongation;    ///< 0-15. When not supported: 0.
+  uint8_t lidar_status;  ///< 0=none, 1=transition, 2=normal, 3=failed. When not supported: 0.
+  uint8_t
+    lidar_mode;  ///< 1=sleep, 2=standby, 3=work_normal, 6=protection, etc. When not supported: 0.
+  uint8_t pkt_version_major;  ///< 0-255. When not supported: 0.
+  uint8_t pkt_version_minor;  ///< 0-255. When not supported: 0.
+  uint8_t lidar_type;  ///< Seyond LiDAR type 0-7 (see docs/lidar_type.md). When not supported: 0.
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -139,9 +143,9 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointEnXYZIT,
   (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
-    uint32_t, timestamp, timestamp)(int8_t, refl_type, refl_type)(int16_t, elongation, elongation)(
-    int8_t, lidar_status,
-    lidar_status)(int8_t, lidar_mode, lidar_mode)(int16_t, pkt_version_major, pkt_version_major)(
-    int16_t, pkt_version_minor, pkt_version_minor)(int16_t, lidar_type, lidar_type))
+    uint32_t, timestamp, timestamp)(uint16_t, flags, flags)(uint8_t, refl_type, refl_type)(
+    uint8_t, elongation, elongation)(uint8_t, lidar_status, lidar_status)(
+    uint8_t, lidar_mode, lidar_mode)(uint8_t, pkt_version_major, pkt_version_major)(
+    uint8_t, pkt_version_minor, pkt_version_minor)(uint8_t, lidar_type, lidar_type))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP

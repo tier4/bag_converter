@@ -1,6 +1,6 @@
 # LiDAR Type
 
-This value is valid for Seyond LiDAR only; for other sensors it is always -1.
+This field is supported for Seyond LiDAR only. When not supported (e.g. other sensors), the value is **0** and must be ignored; check the `HAS_LIDAR_TYPE` bit in the en_xyzit [flags](flags.md) to know if the value is valid.
 
 | Value | Name / alias         | Description           |
 | ----- | -------------------- | --------------------- |

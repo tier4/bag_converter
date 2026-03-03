@@ -128,15 +128,9 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
     return nullptr;
   }
 
-  // Packet version and lidar_type (experimental, en_xyzit only): from first Seyond data packet
-  int16_t pkt_version_major = -1;
-  int16_t pkt_version_minor = -1;
-  int16_t lidar_type = -1;
+  PacketMeta packet_meta;
   if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
-    const PacketMeta meta = extract_packet_meta(input);
-    pkt_version_major = meta.version_major;
-    pkt_version_minor = meta.version_minor;
-    lidar_type = meta.lidar_type;
+    packet_meta = extract_packet_meta(input);
   }
 
   // Convert NebulaPointCloud to OutputPointT for PCL conversion
@@ -154,13 +148,27 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
     pc2_pt.z = pt.z;
     pc2_pt.intensity = pt.intensity;
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
-      pc2_pt.refl_type = -1;   // Not available: NebulaPackets does not provide point classification
-      pc2_pt.elongation = -1;  // Not available: NebulaPoint has no elongation
-      pc2_pt.lidar_status = -1;  // Not available: NebulaPackets does not provide lidar status
-      pc2_pt.lidar_mode = -1;    // Not available: NebulaPackets does not provide lidar mode
-      pc2_pt.pkt_version_major = pkt_version_major;
-      pc2_pt.pkt_version_minor = pkt_version_minor;
-      pc2_pt.lidar_type = lidar_type;
+      namespace fl = bag_converter::point::en_xyzit_flags;
+      pc2_pt.flags = 0;
+      pc2_pt.refl_type = 0;
+      pc2_pt.elongation = 0;
+      pc2_pt.lidar_status = 0;
+      pc2_pt.lidar_mode = 0;
+      pc2_pt.pkt_version_major = 0;
+      pc2_pt.pkt_version_minor = 0;
+      pc2_pt.lidar_type = 0;
+      if (packet_meta.version_major >= 0) {
+        pc2_pt.pkt_version_major = static_cast<uint8_t>(packet_meta.version_major);
+        pc2_pt.flags |= fl::HAS_PKT_VERSION_MAJOR;
+      }
+      if (packet_meta.version_minor >= 0) {
+        pc2_pt.pkt_version_minor = static_cast<uint8_t>(packet_meta.version_minor);
+        pc2_pt.flags |= fl::HAS_PKT_VERSION_MINOR;
+      }
+      if (packet_meta.lidar_type >= 0) {
+        pc2_pt.lidar_type = static_cast<uint8_t>(packet_meta.lidar_type);
+        pc2_pt.flags |= fl::HAS_LIDAR_TYPE;
+      }
     }
     if constexpr (
       std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||
