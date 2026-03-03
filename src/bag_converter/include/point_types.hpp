@@ -106,7 +106,7 @@ struct EIGEN_ALIGN16 PointEnXYZIT
     lidar_mode;  ///< 1=sleep, 2=standby, 3=work_normal, 6=protection, etc. When not supported: 0.
   uint8_t pkt_version_major;  ///< 0-255. When not supported: 0.
   uint8_t pkt_version_minor;  ///< 0-255. When not supported: 0.
-  uint8_t lidar_type;  ///< Seyond LiDAR type 0-7 (see docs/lidar_type.md). When not supported: 0.
+  uint8_t lidar_type;  ///< Seyond LiDAR type 0-7 (see docs/en_xyzit.md). When not supported: 0.
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
