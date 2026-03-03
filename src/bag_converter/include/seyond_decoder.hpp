@@ -42,8 +42,7 @@ inline constexpr double max_range = 200.0;
 inline constexpr const char * frame_id = "lidar";
 inline constexpr size_t data_buffer_size_bytes = 2 * 1024 * 1024;  // 2MB buffer
 inline constexpr size_t initial_points_capacity =
-  100000;                                 // Initial capacity for point cloud reservation
-inline constexpr int min_conf_level = 0;  // 0 = no filtering
+  100000;  // Initial capacity for point cloud reservation
 }  // namespace defaults
 
 // Configuration for the decoder
@@ -52,7 +51,6 @@ struct SeyondPCDDecoderConfig
   double min_range = defaults::min_range;
   double max_range = defaults::max_range;
   std::string frame_id = defaults::frame_id;
-  int min_conf_level = defaults::min_conf_level;
 };
 
 /**

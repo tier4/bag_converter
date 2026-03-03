@@ -13,7 +13,6 @@
 #include "tf_transformer.hpp"
 
 #include <algorithm>
-#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <queue>
@@ -26,40 +25,6 @@ static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 
 namespace bag_converter
 {
-
-/**
- * @brief Extract header.stamp from CDR-serialized ROS 2 message
- *
- * For message types with std_msgs/msg/Header as the first field,
- * the stamp (sec + nanosec) is located at bytes 4-11 after the 4-byte CDR header.
- *
- * @param serialized_data The CDR-serialized message data
- * @return The extracted timestamp, or std::nullopt if data is too small
- */
-std::optional<rclcpp::Time> extract_header_stamp_from_cdr(
-  const rcutils_uint8_array_t & serialized_data)
-{
-  // CDR layout: [4-byte encapsulation header][stamp.sec (int32)][stamp.nanosec (uint32)]...
-  if (serialized_data.buffer_length < defaults::cdr_header_min_size) {
-    return std::nullopt;
-  }
-
-  const uint8_t * buf = serialized_data.buffer;
-  int32_t sec;
-  uint32_t nanosec;
-  std::memcpy(&sec, buf + 4, sizeof(sec));
-  std::memcpy(&nanosec, buf + 8, sizeof(nanosec));
-
-  // Sanity check: skip messages where the extracted bytes are not a valid epoch timestamp
-  // (e.g. tf2_msgs/msg/TFMessage where offset 4-7 is an array length, not stamp.sec)
-  const int64_t stamp_ns =
-    static_cast<int64_t>(sec) * 1'000'000'000 + static_cast<int64_t>(nanosec);
-  if (stamp_ns < defaults::cdr_stamp_min_epoch_ns) {
-    return std::nullopt;
-  }
-
-  return rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
-}
 
 std::pair<std::string, std::string> extract_sensor_info(
   const std::string & topic_name, const std::string & suffix, const std::string & default_frame_id)
@@ -153,14 +118,6 @@ void print_usage()
     << "                            In both modes, TF data is pre-loaded before processing,\n"
     << "                            so transforms are available even if TF messages appear\n"
     << "                            after point cloud messages in the bag.\n"
-    << "  --min-conf-level <0-3>    [Experimental] Min packet confidence (Falcon only)\n"
-    << "                            (default: 0, no filtering). Filters at packet level.\n"
-    << "  --use-header-stamp-as-log-time\n"
-    << "                            Override mcap log_time with header.stamp for all\n"
-    << "                            messages that contain a std_msgs/msg/Header\n"
-    << "  --passthrough             Process all messages even without decodable topics.\n"
-    << "                            Useful with --use-header-stamp-as-log-time to rewrite\n"
-    << "                            log_time for bags without LiDAR packet topics.\n"
     << "  --merge                   Merge bag files from distributed log modules, then\n"
     << "                            convert. Accepts multiple input directories.\n"
     << "  --delete                  Delete source bag files after successful processing.\n"
@@ -182,7 +139,7 @@ static bool option_takes_value(const std::string & arg)
 {
   return arg == "--min-range" || arg == "--max-range" || arg == "--point-type" ||
          arg == "--timescale-correction" || arg == "--timescale-correction-ref" ||
-         arg == "--min-conf-level" || arg == "--base-frame" || arg == "--tf-mode";
+         arg == "--base-frame" || arg == "--tf-mode";
 }
 
 std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & config)
@@ -288,13 +245,6 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
                   << "'. Must be 'utc', 'tai', or 'gps'.\n";
         return 1;
       }
-    } else if (arg == "--min-conf-level" && i + 1 < argc) {
-      int level = std::stoi(argv[++i]);
-      if (level < 0 || level > 3) {
-        std::cerr << "Error: --min-conf-level must be between 0 and 3.\n";
-        return 1;
-      }
-      config.min_conf_level = level;
     } else if (arg == "--base-frame" && i + 1 < argc) {
       config.frame = argv[++i];
     } else if (arg == "--tf-mode" && i + 1 < argc) {
@@ -308,10 +258,6 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
                   << "'. Must be 'static' or 'dynamic'.\n";
         return 1;
       }
-    } else if (arg == "--use-header-stamp-as-log-time") {
-      config.use_header_stamp_as_log_time = true;
-    } else if (arg == "--passthrough") {
-      config.passthrough = true;
     } else if (arg == "--merge" || arg == "--delete") {
       // Already processed in pre-scan
     } else if (arg == "--help" || arg == "-h" || arg == "--version" || arg == "-v") {
@@ -400,7 +346,6 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
       decoder::seyond::SeyondPCDDecoderConfig decoder_config;
       decoder_config.min_range = config.min_range;
       decoder_config.max_range = config.max_range;
-      decoder_config.min_conf_level = config.min_conf_level;
 
       auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
       decoder_config.frame_id = frame_id;
@@ -497,16 +442,11 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     }
   }
 
-  if (!has_decodable_topics && !config.passthrough) {
+  if (!has_decodable_topics) {
     RCLCPP_WARN(
       g_logger, "Skipping conversion: no decodable topics found in %s",
       config.src_bag_path.c_str());
     return BagConverterResultStatus::kSkipped;
-  }
-
-  if (!has_decodable_topics && config.passthrough) {
-    RCLCPP_INFO(
-      g_logger, "Passthrough mode: no decodable topics, all messages will be passed through");
   }
 
   if (transformer && !has_tf_topic) {
@@ -616,14 +556,9 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     const auto & topic_name = bag_msg->topic_name;
     auto type_it = topic_types.find(topic_name);
     if (type_it == topic_types.end()) {
-      if (config.use_header_stamp_as_log_time) {
-        auto stamp = extract_header_stamp_from_cdr(*bag_msg->serialized_data);
-        if (stamp) {
-          bag_msg->time_stamp = stamp->nanoseconds();
-        }
-      }
-      writer.write(bag_msg);
-      continue;
+      RCLCPP_ERROR(
+        g_logger, "Unknown topic in bag metadata: \"%s\". Conversion stopped.", topic_name.c_str());
+      return BagConverterResultStatus::kError;
     }
 
     const auto & topic_type = type_it->second;
@@ -633,12 +568,6 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
 
     if (!is_nebula && !is_seyond) {
       // Other messages: pass through
-      if (config.use_header_stamp_as_log_time) {
-        auto stamp = extract_header_stamp_from_cdr(*bag_msg->serialized_data);
-        if (stamp) {
-          bag_msg->time_stamp = stamp->nanoseconds();
-        }
-      }
       writer.write(bag_msg);
 
       if (message_count % defaults::progress_log_interval == 0) {
@@ -697,9 +626,7 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
       pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_msg_serialized.get());
 
-      const auto log_time = config.use_header_stamp_as_log_time
-                              ? rclcpp::Time(pointcloud_msg->header.stamp)
-                              : rclcpp::Time(bag_msg->time_stamp);
+      const auto log_time = rclcpp::Time(bag_msg->time_stamp);
       writer.write(
         pc2_msg_serialized, conversion_stats[topic_name].output_topic,
         "sensor_msgs/msg/PointCloud2", log_time);
@@ -962,8 +889,8 @@ static int64_t merge_and_convert_group(
     }
   }
 
-  if (!has_decodable_topics && !config.passthrough) {
-    RCLCPP_INFO(g_logger, "No decodable topics found. Performing merge only (no conversion).");
+  if (!has_decodable_topics) {
+    RCLCPP_WARN(g_logger, "No decodable topics found. Performing merge only (no conversion).");
   }
 
   // 3. Create TF transformer and pre-load from all input bags
@@ -1091,7 +1018,14 @@ static int64_t merge_and_convert_group(
 
     const auto & topic_name = entry.message->topic_name;
     auto type_it = topic_types.find(topic_name);
-    const auto & topic_type = (type_it != topic_types.end()) ? type_it->second : std::string();
+    if (type_it == topic_types.end()) {
+      RCLCPP_ERROR(
+        g_logger, "Unknown topic in bag metadata: \"%s\". Conversion stopped.", topic_name.c_str());
+      writer.close();
+      fs::remove_all(temp_dir, ec);
+      return -1;
+    }
+    const auto & topic_type = type_it->second;
 
     bool is_nebula = (topic_type == "nebula_msgs/msg/NebulaPackets");
     bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
@@ -1149,9 +1083,7 @@ static int64_t merge_and_convert_group(
           auto pc2_serialized = std::make_shared<rclcpp::SerializedMessage>();
           pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_serialized.get());
 
-          const auto log_time = config.use_header_stamp_as_log_time
-                                  ? rclcpp::Time(pointcloud_msg->header.stamp)
-                                  : rclcpp::Time(entry.message->time_stamp);
+          const auto log_time = rclcpp::Time(entry.message->time_stamp);
           writer.write(
             pc2_serialized, conversion_stats[topic_name].output_topic,
             "sensor_msgs/msg/PointCloud2", log_time);
@@ -1160,13 +1092,7 @@ static int64_t merge_and_convert_group(
         }
       }
     } else {
-      // Non-decodable topic: passthrough with optional log_time override
-      if (config.use_header_stamp_as_log_time) {
-        auto stamp = extract_header_stamp_from_cdr(*entry.message->serialized_data);
-        if (stamp) {
-          entry.message->time_stamp = stamp->nanoseconds();
-        }
-      }
+      // Non-decodable topic: pass through
       writer.write(entry.message);
     }
 

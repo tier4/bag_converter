@@ -50,15 +50,9 @@ inline constexpr double min_range = 0.3;
 inline constexpr double max_range = 200.0;
 inline constexpr bool keep_original_topics = false;
 
-// Seyond-specific defaults
-inline constexpr int min_conf_level = 0;  // 0 = no filtering
-
 // Progress logging interval
 inline constexpr size_t progress_log_interval = 1000;
 
-// CDR header stamp extraction
-inline constexpr size_t cdr_header_min_size = 4 + 4 + 4;  // CDR header + sec + nanosec
-inline constexpr int64_t cdr_stamp_min_epoch_ns = 1'000'000'000LL * 1'000'000'000LL;  // ~2001-09-09
 }  // namespace defaults
 
 /**
@@ -100,9 +94,6 @@ struct BagConverterConfig
   double max_range = defaults::max_range;
   bool keep_original_topics = defaults::keep_original_topics;
 
-  // Seyond-specific configuration
-  int min_conf_level = defaults::min_conf_level;
-
   // Output point type
   PointType point_type = PointType::kXYZIT;
 
@@ -113,12 +104,6 @@ struct BagConverterConfig
   // TF2 coordinate transformation
   std::string frame;
   BagConverterTfMode tf_mode = BagConverterTfMode::kStatic;
-
-  // Log time override
-  bool use_header_stamp_as_log_time = false;
-
-  // Passthrough mode (process all messages even without decodable topics)
-  bool passthrough = false;
 
   // Delete source files after successful conversion
   bool delete_sources = false;
