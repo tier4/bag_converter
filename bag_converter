@@ -3,6 +3,9 @@
 # Docker image tag
 IMAGE_TAG="latest"
 
+# Path to the bag_converter binary inside the container
+BIN="/opt/drs/install/bag_converter/lib/bag_converter/bag_converter"
+
 # Check if Docker is installed
 if ! command -v docker >/dev/null 2>&1; then
     echo "Error: Docker is not installed. Please install Docker from https://docs.docker.com/engine/install/"
@@ -37,7 +40,7 @@ fi
 if [ $# -eq 0 ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--version" ] || [ "${1:-}" = "-v" ]; then
     docker run $DOCKER_FLAGS --rm \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter "$@"
+        "$BIN" "$@"
     exit $?
 fi
 
@@ -114,7 +117,7 @@ if $HAS_MERGE; then
     docker run $DOCKER_FLAGS --rm \
         "${DOCKER_VOLUMES[@]}" \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter "${CONTAINER_ARGS[@]}" "${OPTIONS[@]}"
+        "$BIN" "${CONTAINER_ARGS[@]}" "${OPTIONS[@]}"
     exit $?
 fi
 
@@ -136,7 +139,7 @@ if [ ${#POSITIONAL[@]} -ge 2 ] && [ -d "${POSITIONAL[0]}" ]; then
         -v "$INPUT_ABS":/input:$INPUT_MOUNT_MODE \
         -v "$OUTPUT_ABS":/output \
         bag_converter:${IMAGE_TAG} \
-        ros2 run bag_converter bag_converter /input /output "${OPTIONS[@]}"
+        "$BIN" /input /output "${OPTIONS[@]}"
     exit $?
 fi
 
@@ -164,14 +167,12 @@ if [ ${#POSITIONAL[@]} -ge 2 ]; then
     docker run $DOCKER_FLAGS --rm \
         -v "$INPUT_DIR":/input:$INPUT_MOUNT_MODE \
         -v "$OUTPUT_DIR":/output \
-        -e INPUT_FILE="$INPUT_FILE" \
-        -e OUTPUT_FILE="$OUTPUT_FILE" \
         bag_converter:${IMAGE_TAG} \
-        sh -c 'ros2 run bag_converter bag_converter "/input/$INPUT_FILE" "/output/$OUTPUT_FILE" "$@"' -- "${OPTIONS[@]}"
+        "$BIN" "/input/$INPUT_FILE" "/output/$OUTPUT_FILE" "${OPTIONS[@]}"
     exit $?
 fi
 
 # Fallback: not enough args — pass to binary to show usage
 docker run $DOCKER_FLAGS --rm \
     bag_converter:${IMAGE_TAG} \
-    ros2 run bag_converter bag_converter "$@"
+    "$BIN" "$@"
