@@ -34,6 +34,8 @@ struct PacketMeta
 };
 
 /// Read packet version and lidar_type from the first Seyond data packet in \a packets.
+/// AngleHV table packets (type 100 at byte offset 38) are skipped because Robin W NebulaPackets
+/// prepend a calibration packet (nebula_drs decoder_wrapper.cpp) whose version fields may be zero.
 /// Layout matches nebula_drs: SeyondCommonVersion at 0-5, lidar_type in SeyondCommonHeader at 15.
 PacketMeta extract_packet_meta(const nebula_msgs::msg::NebulaPackets & packets)
 {
@@ -42,12 +44,21 @@ PacketMeta extract_packet_meta(const nebula_msgs::msg::NebulaPackets & packets)
   // SeyondCommonHeader: version(6) + checksum(4) + size(4) + source_id/timestamp_sync_type(1) +
   // lidar_type(1) → lidar_type at offset 15
   static constexpr size_t kLidarTypeOffset = 15;
+  // Packet type field offset (matches kSeyondPktTypeIndex in nebula_drs)
+  static constexpr size_t kPacketTypeOffset = 38;
   for (const auto & packet : packets.packets) {
     if (packet.data.size() < sizeof(SeyondCommonVersion)) {
       continue;
     }
     const auto * common_version = reinterpret_cast<const SeyondCommonVersion *>(packet.data.data());
     if (common_version->magic_number != kSeyondMagicNumberDataPacket) {
+      continue;
+    }
+    // Skip AngleHV table packets (Robin W calibration data prepended by nebula_drs)
+    if (
+      packet.data.size() > kPacketTypeOffset &&
+      packet.data[kPacketTypeOffset] ==
+        ::nebula::drivers::seyond_packet::SEYOND_ROBINW_ITEM_TYPE_ANGLEHV_TABLE) {
       continue;
     }
     PacketMeta meta;
