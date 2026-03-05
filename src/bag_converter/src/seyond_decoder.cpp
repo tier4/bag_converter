@@ -150,11 +150,13 @@ void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
   // Store per-packet LiDAR state for use in point_xyz_data_parse
   pkt_lidar_mode_ = pkt->common.lidar_mode;
   pkt_lidar_status_ = pkt->common.lidar_status;
-  if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
-    pkt_lidar_type_ = pkt->common.lidar_type;
-    pkt_version_major_ = pkt->common.version.major_version;
-    pkt_version_minor_ = pkt->common.version.minor_version;
-  }
+  pkt_lidar_type_ = pkt->common.lidar_type;
+  pkt_version_major_ = pkt->common.version.major_version;
+  pkt_version_minor_ = pkt->common.version.minor_version;
+
+  // Robin W with protocol major version <= 3 reports intensity in [0, 4095]
+  scale_intensity_12bit_ =
+    (pkt->common.lidar_type == INNO_LIDAR_TYPE_ROBINW && pkt->common.version.major_version <= 3);
 
   // Parse point data based on packet type (different lidars use different structures)
   if (CHECK_EN_XYZ_POINTCLOUD_DATA(pkt->type)) {
@@ -192,6 +194,11 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
                                     : static_cast<float>(point_ptr->intensity);
     } else if constexpr (std::is_same<PointType, const InnoXyzPoint *>::value) {
       point.intensity = static_cast<float>(point_ptr->refl);
+    }
+
+    // Scale 12-bit intensity [0, 4095] to 8-bit [0, 255] for Robin W protocol <= v3
+    if (scale_intensity_12bit_) {
+      point.intensity = point.intensity * (255.0f / 4095.0f);
     }
 
     // Set timestamp (relative time from scan start)
