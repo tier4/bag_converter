@@ -250,16 +250,15 @@ if (scale_intensity_12bit_) {
 | Packet timestamp base       | Host wall-clock                                      | SDK / LiDAR clock                                                           |
 | Intensity scaling (compact) | Reflectance: 255/4095 (<=v3); Intensity: 255/1600    | Delegated to decoder                                                        |
 
-## 10. Implications for bag_converter
+## 10. Implementation in bag_converter
 
-To decode NebulaPackets using the existing `SeyondPCDDecoder`:
+`NebulaPCDDecoder` adapts NebulaPackets to `SeyondScan` format and delegates decoding to `SeyondPCDDecoder`. This eliminates the nebula driver dependency and ensures identical point cloud output regardless of input type.
 
-1. **Packet type detection**: Must parse the `SeyondDataPacket` header from raw bytes to distinguish data packets from AngleHV calibration packets (check `type == SEYOND_ROBINW_ITEM_TYPE_ANGLEHV_TABLE (100)` or use magic number validation).
+The adaptation pipeline in `NebulaPCDDecoder::decode_typed()` ([nebula_decoder.cpp](../src/bag_converter/src/nebula_decoder.cpp)):
 
-2. **Protocol compatibility**: Must apply `ProtocolCompatibility()` (v1 header padding) before parsing. SeyondScan packets do not need this.
+1. **Packet validation**: Check magic number (`0x176A`) and minimum size (60 bytes). Skip invalid packets.
+2. **Protocol v1 → v2 compatibility**: Insert 16 zero bytes at offset 54 and update the packet size field for v1 packets. SeyondScan packets are already v2.
+3. **Packet type classification**: After v1 compat, inspect the `InnoDataPacket.type` field. AngleHV calibration packets (`CHECK_ANGLEHV_TABLE_DATA`) are tagged as `PACKET_TYPE_HVTABLE`; data packets as `PACKET_TYPE_POINTS`. Non-data packets (MESSAGE, MESSAGE_LOG) are filtered out.
+4. **Delegation**: Build a `SeyondScan` message from the adapted packets and call `SeyondPCDDecoder::decode_typed()`.
 
-3. **Calibration packet extraction**: The HVTABLE packet is at position 0 (not at the end). Its content format may differ -- verify whether the calibration string is a complete `SeyondDataPacket + SeyondAngleHVTable` or just the table data.
-
-4. **Packet validation**: Apply `IsPacketValid()` equivalent to skip non-data packets that may exist in NebulaPackets bags.
-
-5. **Coordinate conversion**: Both use the same Seyond SDK `InnoDataPacket` structure internally, so the same `convert_and_parse()` / `data_packet_parse()` logic applies once the raw data is correctly extracted and version-normalized.
+This approach reuses all decoding logic (coordinate conversion, intensity scaling, AngleHV table handling, en_xyzit metadata) from the single `SeyondPCDDecoder` implementation.

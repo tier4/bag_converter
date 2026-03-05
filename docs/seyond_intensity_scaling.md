@@ -23,19 +23,14 @@ No clamping is applied so that out-of-range values remain visible for debugging.
 
 ## Where Scaling is Applied
 
-### seyond_decoder (SeyondScan input)
+### SeyondPCDDecoder (unified decoder for both SeyondScan and NebulaPackets)
 
 In [seyond_decoder.cpp](../src/bag_converter/src/seyond_decoder.cpp):
 
 - `data_packet_parse()` reads `lidar_type` and `major_version` from each `InnoDataPacket` header and sets the `scale_intensity_12bit_` flag.
 - `point_xyz_data_parse()` applies scaling immediately after setting `point.intensity`.
 
-### nebula_decoder (NebulaPackets input)
-
-In [nebula_decoder.cpp](../src/bag_converter/src/nebula_decoder.cpp):
-
-- `extract_packet_meta()` reads `lidar_type` and `major_version` from the first valid data packet.
-- `decode_typed()` checks `PacketMeta::needs_intensity_scaling()` and applies scaling when converting each point.
+Both input types use the same scaling path: `NebulaPCDDecoder` adapts NebulaPackets to `SeyondScan` format (including protocol v1-to-v2 header padding) and delegates to `SeyondPCDDecoder`.
 
 ## Protocol Version Reference
 

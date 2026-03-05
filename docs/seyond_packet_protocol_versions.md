@@ -110,6 +110,8 @@ When reading `pkt_version_major` / `pkt_version_minor` from rosbag data:
 
 This version difference is expected and does not indicate a firmware mismatch or data corruption. The `extend_reserved` field is the only structural addition in v2, and it is always zeroed.
 
-### nebula_drs ProtocolCompatibility
+### bag_converter v1 compatibility
 
-nebula_drs has its own v1 → v2 adaptation in `SeyondDecoder::ProtocolCompatibility()` (`nebula_decoders/src/nebula_decoders_seyond/decoders/seyond_decoder.cpp`). It inserts the same 16 bytes at offset 54 for v1 packets, but operates on a **local copy** inside `unpack()` — the original packet data stored in NebulaPackets remains in v1 format.
+`NebulaPCDDecoder` ([nebula_decoder.cpp](../src/bag_converter/src/nebula_decoder.cpp)) applies its own v1 → v2 adaptation when processing NebulaPackets. It inserts 16 zero bytes at offset 54 and updates the packet size field, matching the approach used by nebula_drs `SeyondDecoder::ProtocolCompatibility()`. After adaptation, the packet is tagged as a `SeyondPacket` and delegated to `SeyondPCDDecoder` for decoding.
+
+SeyondScan packets are always v2 (converted by the SDK before recording), so no v1 compatibility is needed for that path.
