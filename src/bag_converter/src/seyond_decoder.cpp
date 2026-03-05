@@ -39,7 +39,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
 {
   // Create point cloud for processing
   pcl::PointCloud<OutputPointT> cloud;
-  cloud.header.frame_id = input.header.frame_id.empty() ? config_.frame_id : input.header.frame_id;
+  cloud.header.frame_id = input.header.frame_id;
   cloud.header.stamp = input.header.stamp.sec * 1000000ULL + input.header.stamp.nanosec / 1000;
   cloud.points.reserve(defaults::initial_points_capacity);
 

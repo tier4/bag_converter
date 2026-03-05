@@ -45,7 +45,6 @@ namespace defaults
 inline constexpr size_t min_points_per_scan = 1000;
 
 // Common configuration defaults
-inline constexpr const char * frame_id = "lidar";
 inline constexpr double min_range = 0.3;
 inline constexpr double max_range = 200.0;
 inline constexpr bool keep_original_topics = false;
@@ -89,7 +88,6 @@ struct BagConverterConfig
   std::string dst_bag_path;
 
   // Common configuration
-  std::string frame_id = defaults::frame_id;
   double min_range = defaults::min_range;
   double max_range = defaults::max_range;
   bool keep_original_topics = defaults::keep_original_topics;
@@ -115,16 +113,6 @@ struct BagConverterConfig
   bool merge = false;
   std::vector<std::string> input_dirs;
 };
-
-/**
- * @brief Extract sensor info (frame_id and sensor_model) from topic name
- * @param topic_name The topic name to extract info from
- * @param suffix The suffix to look for (e.g., "/nebula_packets" or "/seyond_packets")
- * @param default_frame_id Default frame_id if extraction fails
- * @return Pair of (frame_id, sensor_model)
- */
-std::pair<std::string, std::string> extract_sensor_info(
-  const std::string & topic_name, const std::string & suffix, const std::string & default_frame_id);
 
 /**
  * @brief Generate output topic name from input topic name

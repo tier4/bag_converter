@@ -11,11 +11,13 @@
 
 #include "nebula_decoder.hpp"
 
+#include "sdk_client/inno_lidar_packet_v1_adapt.h"
 #include "sdk_common/inno_lidar_packet.h"
 #include "sdk_common/inno_lidar_packet_utils.h"
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <cstddef>
 #include <cstring>
 
 namespace bag_converter::decoder::nebula
@@ -24,15 +26,17 @@ namespace bag_converter::decoder::nebula
 namespace
 {
 
-// Protocol constants (matching nebula_drs SeyondDecoder values)
-constexpr uint16_t kMagicNumber = 0x176A;
-constexpr uint8_t kProtocolMajorV1 = 1;
-constexpr uint16_t kV1HeaderLen = 54;  // InnoDataPacketV1 header size
-constexpr uint16_t kV2HeaderLen = 70;  // InnoDataPacket header size (kV1HeaderLen + 16)
+// Minimum packet size for validation (no SDK equivalent)
 constexpr size_t kMinPacketSize = 60;
 
-// Byte offset of major_version in the raw packet buffer
-constexpr size_t kMajorVersionOffset = 2;
+// Byte offsets derived from SDK struct layout
+constexpr size_t kMagicNumberOffset =
+  offsetof(InnoCommonHeader, version) + offsetof(InnoCommonVersion, magic_number);
+constexpr size_t kMajorVersionOffset =
+  offsetof(InnoCommonHeader, version) + offsetof(InnoCommonVersion, major_version);
+constexpr size_t kMinorVersionOffset =
+  offsetof(InnoCommonHeader, version) + offsetof(InnoCommonVersion, minor_version);
+constexpr size_t kSizeFieldOffset = offsetof(InnoCommonHeader, size);
 
 /// Check if a raw packet has a valid Seyond data packet header.
 bool is_valid_data_packet(const std::vector<uint8_t> & data)
@@ -41,8 +45,8 @@ bool is_valid_data_packet(const std::vector<uint8_t> & data)
     return false;
   }
   uint16_t magic;
-  std::memcpy(&magic, data.data(), sizeof(magic));
-  if (magic != kMagicNumber) {
+  std::memcpy(&magic, data.data() + kMagicNumberOffset, sizeof(magic));
+  if (magic != kInnoMagicNumberDataPacket) {
     return false;
   }
   // Reject non-data packet types (MESSAGE=2, MESSAGE_LOG=3)
@@ -67,21 +71,23 @@ bool is_anglehv_table_packet(const std::vector<uint8_t> & data)
 /// Modifies the buffer in place and updates the packet size field.
 void apply_v1_compat(std::vector<uint8_t> & buffer)
 {
-  if (buffer.size() < kV1HeaderLen) {
+  if (buffer.size() < sizeof(InnoDataPacketV1)) {
     return;
   }
   uint8_t major_version = buffer[kMajorVersionOffset];
-  if (major_version != kProtocolMajorV1) {
+  if (major_version != InnoPacketV1Adapt::kInnoProtocolMajorV1) {
     return;
   }
-  // Update packet size field (uint32_t at offset 4 in InnoCommonHeader)
-  constexpr size_t kSizeFieldOffset = 4;
+  // Update packet size field
   uint32_t packet_size;
   std::memcpy(&packet_size, &buffer[kSizeFieldOffset], sizeof(packet_size));
-  packet_size += 16;
+  packet_size += InnoPacketV1Adapt::kMemorryFrontGap;
   std::memcpy(&buffer[kSizeFieldOffset], &packet_size, sizeof(packet_size));
-  // Insert 16 zero bytes at the old header boundary
-  buffer.insert(buffer.begin() + kV1HeaderLen, 16, 0);
+  // Update version fields to match SDK conversion output
+  buffer[kMajorVersionOffset] = InnoPacketV1Adapt::kInnoProtocolMajorV2;
+  buffer[kMinorVersionOffset] = InnoPacketV1Adapt::kInnoProtocolMinorV2;
+  // Insert zero bytes at the old header boundary to pad to v2
+  buffer.insert(buffer.begin() + sizeof(InnoDataPacketV1), InnoPacketV1Adapt::kMemorryFrontGap, 0);
 }
 
 }  // anonymous namespace
@@ -95,7 +101,6 @@ NebulaPCDDecoder<OutputPointT>::NebulaPCDDecoder(const NebulaPCDDecoderConfig & 
   seyond::SeyondPCDDecoderConfig seyond_config;
   seyond_config.min_range = config.min_range;
   seyond_config.max_range = config.max_range;
-  seyond_config.frame_id = config.frame_id;
   seyond_decoder_.set_config(seyond_config);
 }
 
@@ -109,6 +114,8 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
   // Build a SeyondScan message from adapted NebulaPackets
   bag_converter::msg::SeyondScan scan;
   scan.header = input.header;
+  // NebulaPackets.header.frame_id is always empty (nebula_drs does not set it)
+  scan.header.frame_id = config_.frame_id;
 
   for (const auto & nebula_pkt : input.packets) {
     if (nebula_pkt.data.empty()) {
@@ -133,8 +140,8 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
 
     const auto * pkt = reinterpret_cast<const InnoDataPacket *>(buffer.data());
 
-    // Filter non-data packets (MESSAGE=2, MESSAGE_LOG=3)
-    if (pkt->type == 2 || pkt->type == 3) {
+    // Filter non-data packets
+    if (pkt->type == INNO_ITEM_TYPE_MESSAGE || pkt->type == INNO_ITEM_TYPE_MESSAGE_LOG) {
       continue;
     }
 
@@ -174,7 +181,6 @@ void NebulaPCDDecoder<OutputPointT>::set_config(const NebulaPCDDecoderConfig & c
   seyond::SeyondPCDDecoderConfig seyond_config;
   seyond_config.min_range = config.min_range;
   seyond_config.max_range = config.max_range;
-  seyond_config.frame_id = config.frame_id;
   seyond_decoder_.set_config(seyond_config);
 }
 
