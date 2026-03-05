@@ -25,9 +25,6 @@ namespace bag_converter::decoder::nebula
 namespace
 {
 
-/// Seyond LiDAR type value for Robin W (matches InnoLidarType / SeyondLidarType).
-constexpr int16_t kLidarTypeRobinW = 1;
-
 /// Metadata read from the first Seyond data packet (version + lidar_type).
 struct PacketMeta
 {
@@ -131,10 +128,6 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
   }
 
   const auto packet_meta = extract_packet_meta(input);
-  // Robin W with protocol major version <= 3 reports intensity in [0, 4095]
-  const bool scale_intensity =
-    (packet_meta.lidar_type == kLidarTypeRobinW && packet_meta.version_major >= 0 &&
-     packet_meta.version_major <= 3);
 
   // Convert NebulaPointCloud to OutputPointT for PCL conversion
   pcl::PointCloud<OutputPointT> pc2_cloud;
@@ -149,7 +142,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
     pc2_pt.x = pt.x;
     pc2_pt.y = pt.y;
     pc2_pt.z = pt.z;
-    pc2_pt.intensity = scale_intensity ? pt.intensity * (255.0f / 4095.0f) : pt.intensity;
+    pc2_pt.intensity = pt.intensity;
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
       namespace fl = bag_converter::point::en_xyzit_flags;
       pc2_pt.flags = 0;
