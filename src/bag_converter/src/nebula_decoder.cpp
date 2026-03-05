@@ -34,12 +34,6 @@ struct PacketMeta
   int16_t version_major = -1;
   int16_t version_minor = -1;
   int16_t lidar_type = -1;
-
-  /// Robin W with protocol major version <= 3 reports intensity in [0, 4095].
-  bool needs_intensity_scaling() const
-  {
-    return lidar_type == kLidarTypeRobinW && version_major >= 0 && version_major <= 3;
-  }
 };
 
 /// Read packet version and lidar_type from the first Seyond data packet in \a packets.
@@ -137,7 +131,10 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
   }
 
   const auto packet_meta = extract_packet_meta(input);
-  const bool scale_intensity = packet_meta.needs_intensity_scaling();
+  // Robin W with protocol major version <= 3 reports intensity in [0, 4095]
+  const bool scale_intensity =
+    (packet_meta.lidar_type == kLidarTypeRobinW && packet_meta.version_major >= 0 &&
+     packet_meta.version_major <= 3);
 
   // Convert NebulaPointCloud to OutputPointT for PCL conversion
   pcl::PointCloud<OutputPointT> pc2_cloud;
