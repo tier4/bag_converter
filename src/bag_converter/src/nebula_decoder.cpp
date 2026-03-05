@@ -4,20 +4,19 @@
  *  License: Apache License
  *
  *  Implementation of NebulaPCDDecoder for bag_converter package
+ *
+ *  Adapts NebulaPackets (raw UDP datagrams from nebula_drs) to
+ *  SeyondScan format and delegates decoding to SeyondPCDDecoder.
  */
 
 #include "nebula_decoder.hpp"
 
-#include <nebula_decoders/nebula_decoders_seyond/decoders/seyond_packet.hpp>
-#include <nebula_decoders/nebula_decoders_seyond/seyond_driver.hpp>
+#include "sdk_common/inno_lidar_packet.h"
+#include "sdk_common/inno_lidar_packet_utils.h"
+
 #include <rclcpp/rclcpp.hpp>
 
-#include <pcl_conversions/pcl_conversions.h>
-
-#include <iomanip>
-#include <iostream>
-#include <type_traits>
-#include <utility>
+#include <cstring>
 
 namespace bag_converter::decoder::nebula
 {
@@ -25,39 +24,64 @@ namespace bag_converter::decoder::nebula
 namespace
 {
 
-/// Metadata read from the first Seyond data packet (version + lidar_type).
-struct PacketMeta
-{
-  int16_t version_major = -1;
-  int16_t version_minor = -1;
-  int16_t lidar_type = -1;
-};
+// Protocol constants (matching nebula_drs SeyondDecoder values)
+constexpr uint16_t kMagicNumber = 0x176A;
+constexpr uint8_t kProtocolMajorV1 = 1;
+constexpr uint16_t kV1HeaderLen = 54;  // InnoDataPacketV1 header size
+constexpr uint16_t kV2HeaderLen = 70;  // InnoDataPacket header size (kV1HeaderLen + 16)
+constexpr size_t kMinPacketSize = 60;
 
-/// Read packet version and lidar_type from the first Seyond data packet in \a packets.
-/// AngleHV calibration packets (type SEYOND_ROBINW_ITEM_TYPE_ANGLEHV_TABLE) are skipped because
-/// nebula_drs (decoder_wrapper.cpp) prepends one whose version fields may be zero.
-PacketMeta extract_packet_meta(const nebula_msgs::msg::NebulaPackets & packets)
+// Byte offset of major_version in the raw packet buffer
+constexpr size_t kMajorVersionOffset = 2;
+
+/// Check if a raw packet has a valid Seyond data packet header.
+bool is_valid_data_packet(const std::vector<uint8_t> & data)
 {
-  using ::nebula::drivers::seyond_packet::kSeyondMagicNumberDataPacket;
-  using ::nebula::drivers::seyond_packet::SeyondDataPacket;
-  for (const auto & packet : packets.packets) {
-    if (packet.data.size() < sizeof(SeyondDataPacket)) {
-      continue;
-    }
-    const auto * pkt = reinterpret_cast<const SeyondDataPacket *>(packet.data.data());
-    if (pkt->common.version.magic_number != kSeyondMagicNumberDataPacket) {
-      continue;
-    }
-    if (pkt->type == ::nebula::drivers::seyond_packet::SEYOND_ROBINW_ITEM_TYPE_ANGLEHV_TABLE) {
-      continue;
-    }
-    PacketMeta meta;
-    meta.version_major = static_cast<int16_t>(pkt->common.version.major_version);
-    meta.version_minor = static_cast<int16_t>(pkt->common.version.minor_version);
-    meta.lidar_type = static_cast<int16_t>(pkt->common.lidar_type);
-    return meta;
+  if (data.size() < kMinPacketSize) {
+    return false;
   }
-  return {};
+  uint16_t magic;
+  std::memcpy(&magic, data.data(), sizeof(magic));
+  if (magic != kMagicNumber) {
+    return false;
+  }
+  // Reject non-data packet types (MESSAGE=2, MESSAGE_LOG=3)
+  // The type field offset depends on protocol version, but for filtering
+  // we use the InnoDataPacket layout after v1 compat has been applied.
+  return true;
+}
+
+/// Check if a raw packet is an AngleHV calibration table packet.
+/// Must be called AFTER v1 compatibility has been applied.
+bool is_anglehv_table_packet(const std::vector<uint8_t> & data)
+{
+  if (data.size() < sizeof(InnoDataPacket)) {
+    return false;
+  }
+  const auto * pkt = reinterpret_cast<const InnoDataPacket *>(data.data());
+  return CHECK_ANGLEHV_TABLE_DATA(pkt->type);
+}
+
+/// Apply protocol v1 -> v2 compatibility by inserting 16 zero bytes
+/// at offset kV1HeaderLen to pad the header to v2 size.
+/// Modifies the buffer in place and updates the packet size field.
+void apply_v1_compat(std::vector<uint8_t> & buffer)
+{
+  if (buffer.size() < kV1HeaderLen) {
+    return;
+  }
+  uint8_t major_version = buffer[kMajorVersionOffset];
+  if (major_version != kProtocolMajorV1) {
+    return;
+  }
+  // Update packet size field (uint32_t at offset 4 in InnoCommonHeader)
+  constexpr size_t kSizeFieldOffset = 4;
+  uint32_t packet_size;
+  std::memcpy(&packet_size, &buffer[kSizeFieldOffset], sizeof(packet_size));
+  packet_size += 16;
+  std::memcpy(&buffer[kSizeFieldOffset], &packet_size, sizeof(packet_size));
+  // Insert 16 zero bytes at the old header boundary
+  buffer.insert(buffer.begin() + kV1HeaderLen, 16, 0);
 }
 
 }  // anonymous namespace
@@ -67,47 +91,12 @@ template <typename OutputPointT>
 NebulaPCDDecoder<OutputPointT>::NebulaPCDDecoder(const NebulaPCDDecoderConfig & config)
 : config_(config)
 {
-  // Create sensor configuration
-  sensor_config_ = std::make_shared<::nebula::drivers::SeyondSensorConfiguration>();
-
-  // Set basic network config (these won't be used for offline processing)
-  sensor_config_->host_ip = defaults::dummy_host_ip;
-  sensor_config_->sensor_ip = defaults::dummy_sensor_ip;
-  sensor_config_->data_port = defaults::dummy_data_port;
-  sensor_config_->gnss_port = defaults::dummy_gnss_port;
-  sensor_config_->packet_mtu_size = defaults::dummy_packet_mtu_size;
-
-  // Set sensor model
-  sensor_config_->sensor_model = ::nebula::drivers::SensorModelFromString(config.sensor_model);
-
-  // Set other parameters
-  sensor_config_->frame_id = config.frame_id;
-  sensor_config_->scan_phase = config.scan_phase;
-  sensor_config_->frequency_ms = static_cast<uint16_t>(config.frequency_ms);
-  sensor_config_->use_sensor_time = config.use_sensor_time;
-
-  // Set min/max range
-  sensor_config_->min_range = config.min_range;
-  sensor_config_->max_range = config.max_range;
-
-  // Create calibration configuration
-  calibration_config_ = std::make_shared<::nebula::drivers::SeyondCalibrationConfiguration>();
-
-  // Initialize the driver
-  try {
-    driver_ =
-      std::make_shared<::nebula::drivers::SeyondDriver>(sensor_config_, calibration_config_);
-
-    // Check actual driver status
-    auto driver_status = driver_->GetStatus();  // Note: driver_->GetStatus() is from nebula library
-    if (driver_status != ::nebula::Status::OK) {
-      throw std::runtime_error("Failed to initialize driver: driver status is not OK");
-    }
-  } catch (const std::exception & e) {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("bag_converter.decoder"), "Failed to initialize driver: %s", e.what());
-    throw;  // Re-throw the exception to terminate initialization
-  }
+  // Configure the internal SeyondPCDDecoder
+  seyond::SeyondPCDDecoderConfig seyond_config;
+  seyond_config.min_range = config.min_range;
+  seyond_config.max_range = config.max_range;
+  seyond_config.frame_id = config.frame_id;
+  seyond_decoder_.set_config(seyond_config);
 }
 
 template <typename OutputPointT>
@@ -117,143 +106,58 @@ template <typename OutputPointT>
 sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_typed(
   const nebula_msgs::msg::NebulaPackets & input)
 {
-  // Process NebulaPackets
-  process_nebula_packets(input);
+  // Build a SeyondScan message from adapted NebulaPackets
+  bag_converter::msg::SeyondScan scan;
+  scan.header = input.header;
 
-  // Flush cloud points to get the complete point cloud
-  auto nebula_cloud = flush_cloud_points();
+  for (const auto & nebula_pkt : input.packets) {
+    if (nebula_pkt.data.empty()) {
+      continue;
+    }
 
-  if (!nebula_cloud || nebula_cloud->empty()) {
+    // Copy the raw data so we can apply v1 compat in place
+    std::vector<uint8_t> buffer = nebula_pkt.data;
+
+    // Validate magic number and minimum size
+    if (!is_valid_data_packet(buffer)) {
+      continue;
+    }
+
+    // Apply protocol v1 -> v2 compatibility (16-byte header padding)
+    apply_v1_compat(buffer);
+
+    // Now check packet type after v1 compat
+    if (buffer.size() < sizeof(InnoDataPacket)) {
+      continue;
+    }
+
+    const auto * pkt = reinterpret_cast<const InnoDataPacket *>(buffer.data());
+
+    // Filter non-data packets (MESSAGE=2, MESSAGE_LOG=3)
+    if (pkt->type == 2 || pkt->type == 3) {
+      continue;
+    }
+
+    // Build a SeyondPacket
+    bag_converter::msg::SeyondPacket seyond_pkt;
+    seyond_pkt.stamp = nebula_pkt.stamp;
+
+    if (is_anglehv_table_packet(buffer)) {
+      seyond_pkt.type = bag_converter::msg::SeyondPacket::PACKET_TYPE_HVTABLE;
+    } else {
+      seyond_pkt.type = bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS;
+    }
+
+    seyond_pkt.data = std::move(buffer);
+    scan.packets.push_back(std::move(seyond_pkt));
+  }
+
+  if (scan.packets.empty()) {
     return nullptr;
   }
 
-  const auto packet_meta = extract_packet_meta(input);
-
-  // Convert NebulaPointCloud to OutputPointT for PCL conversion
-  pcl::PointCloud<OutputPointT> pc2_cloud;
-  pc2_cloud.header = nebula_cloud->header;
-  pc2_cloud.header.frame_id = config_.frame_id;
-  pc2_cloud.width = nebula_cloud->width;
-  pc2_cloud.height = nebula_cloud->height;
-  pc2_cloud.is_dense = nebula_cloud->is_dense;
-
-  for (const auto & pt : nebula_cloud->points) {
-    OutputPointT pc2_pt;
-    pc2_pt.x = pt.x;
-    pc2_pt.y = pt.y;
-    pc2_pt.z = pt.z;
-    pc2_pt.intensity = pt.intensity;
-    if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
-      namespace fl = bag_converter::point::en_xyzit_flags;
-      pc2_pt.flags = 0;
-      pc2_pt.refl_type = 0;
-      pc2_pt.elongation = 0;
-      pc2_pt.lidar_status = 0;
-      pc2_pt.lidar_mode = 0;
-      pc2_pt.pkt_version_major = 0;
-      pc2_pt.pkt_version_minor = 0;
-      pc2_pt.lidar_type = 0;
-      if (packet_meta.version_major >= 0) {
-        pc2_pt.pkt_version_major = static_cast<uint8_t>(packet_meta.version_major);
-        pc2_pt.flags |= fl::HAS_PKT_VERSION_MAJOR;
-      }
-      if (packet_meta.version_minor >= 0) {
-        pc2_pt.pkt_version_minor = static_cast<uint8_t>(packet_meta.version_minor);
-        pc2_pt.flags |= fl::HAS_PKT_VERSION_MINOR;
-      }
-      if (packet_meta.lidar_type >= 0) {
-        pc2_pt.lidar_type = static_cast<uint8_t>(packet_meta.lidar_type);
-        pc2_pt.flags |= fl::HAS_LIDAR_TYPE;
-      }
-    }
-    if constexpr (
-      std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||
-      std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
-      // Convert from nanoseconds to microseconds
-      pc2_pt.t_us = pt.time_stamp / 1000;
-      // timestamp is in nanoseconds (same as pt.time_stamp)
-      pc2_pt.timestamp = pt.time_stamp;
-    }
-    pc2_cloud.push_back(pc2_pt);
-  }
-
-  // Create PointCloud2 message
-  auto pc2_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
-  pcl::toROSMsg(pc2_cloud, *pc2_msg);
-  return pc2_msg;
-}
-
-template <typename OutputPointT>
-std::tuple<::nebula::drivers::NebulaPointCloudPtr, bool>
-NebulaPCDDecoder<OutputPointT>::process_packet(const std::vector<uint8_t> & packet)
-{
-  // Process the packet - the driver returns a cloud when scan is complete
-  auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet);
-
-  // Check if a complete scan is available
-  // (ParseCloudPacket returns non-null cloud when scan is complete)
-  if (cloud != nullptr) {
-    return {cloud, true};
-  }
-  return {nullptr, false};
-}
-
-template <typename OutputPointT>
-::nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_packets(
-  const std::vector<std::vector<uint8_t>> & packets)
-{
-  ::nebula::drivers::NebulaPointCloudPtr complete_cloud;
-  double scan_timestamp_s = 0;
-  bool once = false;
-
-  for (const auto & packet : packets) {
-    auto [cloud, cloud_timestamp] = driver_->ParseCloudPacket(packet);
-
-    if (cloud && !cloud->empty() && !once) {
-      // A complete scan was returned
-      once = true;
-      complete_cloud = cloud;
-      scan_timestamp_s = cloud_timestamp;
-    }
-    // NOTE: If multiple scans are packed in the same NebulaPackets message,
-    // return the first complete scan, the rest are buffered in the driver for the next scan.
-  }
-
-  // Set the timestamp in the point cloud header
-  if (complete_cloud && scan_timestamp_s > 0) {
-    // Convert seconds to microseconds (PCL header.stamp is in microseconds)
-    complete_cloud->header.stamp = static_cast<uint64_t>(scan_timestamp_s * 1e6);
-  }
-
-  // Return the last complete cloud if available
-  return complete_cloud;
-}
-
-template <typename OutputPointT>
-::nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::process_nebula_packets(
-  const nebula_msgs::msg::NebulaPackets & packets)
-{
-  std::vector<std::vector<uint8_t>> packet_data_vec;
-
-  // Extract packet data from nebula_msgs
-  for (const auto & packet : packets.packets) {
-    packet_data_vec.push_back(packet.data);
-  }
-
-  return process_packets(packet_data_vec);
-}
-
-template <typename OutputPointT>
-::nebula::drivers::NebulaPointCloudPtr NebulaPCDDecoder<OutputPointT>::flush_cloud_points()
-{
-  auto [cloud, cloud_timestamp] = driver_->FlushCloudPoints();
-
-  if (cloud && cloud_timestamp > 0) {
-    // Convert seconds to microseconds (PCL header.stamp is in microseconds)
-    cloud->header.stamp = static_cast<uint64_t>(cloud_timestamp * 1e6);
-    return cloud;
-  }
-  return nullptr;
+  // Delegate to SeyondPCDDecoder
+  return seyond_decoder_.decode_typed(scan);
 }
 
 template <typename OutputPointT>
@@ -267,14 +171,11 @@ void NebulaPCDDecoder<OutputPointT>::set_config(const NebulaPCDDecoderConfig & c
 {
   config_ = config;
 
-  // Update sensor configuration
-  sensor_config_->sensor_model = ::nebula::drivers::SensorModelFromString(config.sensor_model);
-  sensor_config_->frame_id = config.frame_id;
-  sensor_config_->scan_phase = config.scan_phase;
-  sensor_config_->frequency_ms = static_cast<uint16_t>(config.frequency_ms);
-  sensor_config_->use_sensor_time = config.use_sensor_time;
-  sensor_config_->min_range = config.min_range;
-  sensor_config_->max_range = config.max_range;
+  seyond::SeyondPCDDecoderConfig seyond_config;
+  seyond_config.min_range = config.min_range;
+  seyond_config.max_range = config.max_range;
+  seyond_config.frame_id = config.frame_id;
+  seyond_decoder_.set_config(seyond_config);
 }
 
 // Explicit template instantiations
