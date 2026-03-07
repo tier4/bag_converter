@@ -156,10 +156,10 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
   }
 
   if (skip_status > 0) {
-    RCLCPP_INFO(logger, "Skipped status packets: %zu", skip_status);
+    RCLCPP_DEBUG(logger, "Skipped %zu status packets", skip_status);
   }
   if (skip_invalid > 0) {
-    RCLCPP_WARN(logger, "Skipped invalid packets: %zu", skip_invalid);
+    RCLCPP_WARN(logger, "Skipped %zu invalid packets", skip_invalid);
   }
 
   return scan;
