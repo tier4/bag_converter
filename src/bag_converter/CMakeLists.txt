@@ -26,8 +26,6 @@ find_package(rcutils REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nebula_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(nebula_decoders REQUIRED)
-find_package(nebula_common REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common io)
 find_package(Eigen3 REQUIRED)
@@ -86,8 +84,6 @@ target_include_directories(bag_converter_bin PRIVATE
   ${SEYOND_SDK_PATH}/src
   ${PCL_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
-  ${nebula_decoders_INCLUDE_DIRS}
-  ${nebula_common_INCLUDE_DIRS}
 )
 
 target_link_libraries(bag_converter_bin
@@ -106,8 +102,6 @@ ament_target_dependencies(bag_converter_bin
   rosbag2_cpp
   rosbag2_storage
   pcl_conversions
-  nebula_decoders
-  nebula_common
   tf2
   tf2_msgs
   tf2_sensor_msgs

@@ -1,23 +1,25 @@
 # en_xyzit point type
 
-The `en_xyzit` point type is an **experimental** extension of the default PointCloud2 output. Enable it with `--point-type en_xyzit`. It adds the same normal fields as `xyzit` (x, y, z, intensity, timestamp) plus extended properties for reflection classification, elongation, lidar status/mode, packet version, and lidar type. Support for each extended field depends on the input message type (SeyondScan vs NebulaPackets) and the decoder.
+The `en_xyzit` point type is an **experimental** extension of the default PointCloud2 output. Enable it with `--point-type en_xyzit`. It adds the same normal fields as `xyzit` (x, y, z, intensity, timestamp) plus extended properties for reflection classification, elongation, lidar status/mode, packet version, and lidar type.
 
 **Subject to change.** This document is the canonical reference for the layout and semantics of `en_xyzit`.
 
 ## Extended fields overview
 
-| Property            | Type   | SeyondScan | NebulaPackets | Description / values                                            |
-| ------------------- | ------ | ---------- | ------------- | --------------------------------------------------------------- |
-| `flags`             | uint16 | ✓          | ✓             | Availability mask; see below                                    |
-| `refl_type`         | uint8  | ✓          | —             | Point classification: 0 = normal, 1 = ground, 2 = fog           |
-| `elongation`        | uint8  | ✓          | —             | Raw elongation 0–15                                             |
-| `lidar_status`      | uint8  | ✓          | —             | 0 = none, 1 = transition, 2 = normal, 3 = failed                |
-| `lidar_mode`        | uint8  | ✓          | —             | 1 = sleep, 2 = standby, 3 = work_normal, 6 = protection         |
-| `pkt_version_major` | uint8  | ✓          | ✓             | Packet protocol major (0–255)                                   |
-| `pkt_version_minor` | uint8  | ✓          | ✓             | Packet protocol minor (0–255)                                   |
-| `lidar_type`        | uint8  | ✓          | ✓             | Seyond LiDAR model; see [LiDAR type values](#lidar-type-values) |
+All extended fields are supported for both SeyondScan and NebulaPackets input. The `NebulaPCDDecoder` adapts NebulaPackets to `SeyondScan` format and delegates to the same `SeyondPCDDecoder`, so the output is identical regardless of input type.
 
-When a property is not supported, its value is **0** and must be ignored. Consumers should check the corresponding bit in the `flags` mask before using any extended value.
+| Property            | Type   | Description / values                                            |
+| ------------------- | ------ | --------------------------------------------------------------- |
+| `flags`             | uint16 | Availability mask; see below                                    |
+| `refl_type`         | uint8  | Point classification: 0 = normal, 1 = ground, 2 = fog           |
+| `elongation`        | uint8  | Raw elongation 0–15                                             |
+| `lidar_status`      | uint8  | 0 = none, 1 = transition, 2 = normal, 3 = failed                |
+| `lidar_mode`        | uint8  | 1 = sleep, 2 = standby, 3 = work_normal, 6 = protection         |
+| `pkt_version_major` | uint8  | Packet protocol major (0–255)                                   |
+| `pkt_version_minor` | uint8  | Packet protocol minor (0–255)                                   |
+| `lidar_type`        | uint8  | Seyond LiDAR model; see [LiDAR type values](#lidar-type-values) |
+
+Note: `refl_type` and `elongation` are only available when the packet contains `InnoXyzPoint` data (as opposed to `InnoEnXyzPoint`). The `flags` mask indicates which fields are valid for each point.
 
 ## Availability flags and extended layout
 

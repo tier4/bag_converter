@@ -26,29 +26,13 @@ static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 namespace bag_converter
 {
 
-std::pair<std::string, std::string> extract_sensor_info(
-  const std::string & topic_name, const std::string & suffix, const std::string & default_frame_id)
+/// Extract frame_id from topic name by taking the parent path segment.
+/// e.g. "/sensing/lidar/front/nebula_packets" -> "lidar_front"
+std::string extract_frame_id(const std::string & topic_name)
 {
-  std::string frame_id = default_frame_id;
-  std::string sensor_model;
-
-  size_t last_slash = topic_name.rfind(suffix);
-  if (last_slash != std::string::npos && last_slash > 0) {
-    size_t second_last_slash = topic_name.rfind('/', last_slash - 1);
-    if (second_last_slash != std::string::npos) {
-      std::string sensor_pos =
-        topic_name.substr(second_last_slash + 1, last_slash - second_last_slash - 1);
-      frame_id = "lidar_" + sensor_pos;
-
-      if (sensor_pos == "front" || sensor_pos == "rear") {
-        sensor_model = "Falcon";
-      } else if (sensor_pos == "left" || sensor_pos == "right") {
-        sensor_model = "Robin_W";
-      }
-    }
-  }
-
-  return {frame_id, sensor_model};
+  std::filesystem::path topic(topic_name);
+  auto parent = topic.parent_path().filename().string();
+  return parent.empty() ? "seyond" : "lidar_" + parent;
 }
 
 std::string generate_output_topic(
@@ -324,20 +308,15 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
       decoder::nebula::NebulaPCDDecoderConfig decoder_config;
       decoder_config.min_range = config.min_range;
       decoder_config.max_range = config.max_range;
-
-      auto [frame_id, sensor_model] =
-        extract_sensor_info(topic_name, "/nebula_packets", config.frame_id);
-      decoder_config.frame_id = frame_id;
-      decoder_config.sensor_model = sensor_model;
+      decoder_config.frame_id = extract_frame_id(topic_name);
 
       std::string output_topic =
         generate_output_topic(topic_name, "/nebula_packets", "/nebula_points");
       conversion_stats[topic_name] = {output_topic, 0, 0};
 
       RCLCPP_INFO(
-        g_logger, "Found NebulaPackets topic: %s -> %s (sensor_model: %s, frame_id: %s)",
-        topic_name.c_str(), output_topic.c_str(), decoder_config.sensor_model.c_str(),
-        decoder_config.frame_id.c_str());
+        g_logger, "Found NebulaPackets topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
+        output_topic.c_str(), decoder_config.frame_id.c_str());
 
       return std::make_unique<decoder::nebula::NebulaPCDDecoder<PointT>>(decoder_config);
     }
@@ -347,16 +326,12 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
       decoder_config.min_range = config.min_range;
       decoder_config.max_range = config.max_range;
 
-      auto [frame_id, _] = extract_sensor_info(topic_name, "/seyond_packets", config.frame_id);
-      decoder_config.frame_id = frame_id;
-
       std::string output_topic =
         generate_output_topic(topic_name, "/seyond_packets", "/seyond_points");
       conversion_stats[topic_name] = {output_topic, 0, 0};
 
       RCLCPP_INFO(
-        g_logger, "Found SeyondScan topic: %s -> %s (frame_id: %s)", topic_name.c_str(),
-        output_topic.c_str(), decoder_config.frame_id.c_str());
+        g_logger, "Found SeyondScan topic: %s -> %s", topic_name.c_str(), output_topic.c_str());
 
       return std::make_unique<decoder::seyond::SeyondPCDDecoder<PointT>>(decoder_config);
     }
