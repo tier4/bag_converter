@@ -2,6 +2,8 @@
 
 This document compares how **NebulaPackets** (from `nebula_drs`) and **SeyondScan** (from `seyond_ros_driver`) wrap raw Seyond LiDAR data into ROS messages. Understanding these differences is essential for building a unified decoder in `bag_converter`.
 
+**SeyondScan assumption**: `bag_converter` assumes that `SeyondScan` messages are produced by [Tier4's seyond_ros_driver](https://github.com/tier4/seyond_ros_driver) (fork of [Seyond-Inc/seyond_ros_driver](https://github.com/Seyond-Inc/seyond_ros_driver)). The behavior and message format described for SeyondScan in this document refer to that driver.
+
 ## 1. Message Definitions
 
 ### NebulaPackets (nebula_drs)
@@ -18,7 +20,7 @@ uint8[] data
 
 - **No explicit packet type field** -- the type must be inferred from the raw binary data.
 
-### SeyondScan (seyond_ros_driver)
+### SeyondScan (Tier4 seyond_ros_driver)
 
 ```text
 # SeyondScan.msg
@@ -218,9 +220,9 @@ else
 - Intensity mode: scales [0, 1600] to [0, 255].
 - For non-compact (XYZ/EnXYZ) packets: raw `refl` / `intensity` / `reflectance` fields are used directly with no scaling.
 
-### SeyondScan (seyond_ros_driver)
+### SeyondScan (Tier4 seyond_ros_driver)
 
-The `seyond_ros_driver` in packet mode does not decode points -- it stores raw packets. The decoding logic in frame mode (or subscriber callback) uses the same SDK functions (`inno_lidar_convert_to_xyz_pointcloud2`, etc.) as `bag_converter/seyond_decoder.cpp`.
+The Tier4 seyond_ros_driver in packet mode does not decode points -- it stores raw packets. The decoding logic in frame mode (or subscriber callback) uses the same SDK functions (`inno_lidar_convert_to_xyz_pointcloud2`, etc.) as `bag_converter/seyond_decoder.cpp`.
 
 ### bag_converter's seyond_decoder.cpp
 
@@ -252,13 +254,65 @@ if (scale_intensity_12bit_) {
 
 ## 10. Implementation in bag_converter
 
-`NebulaPCDDecoder` adapts NebulaPackets to `SeyondScan` format and delegates decoding to `SeyondPCDDecoder`. This eliminates the nebula driver dependency and ensures identical point cloud output regardless of input type.
+`NebulaPCDDecoder` is a thin wrapper around `SeyondPCDDecoder`: it converts NebulaPackets to SeyondScan internally and delegates point decoding. This eliminates the nebula driver dependency and ensures identical point cloud output regardless of input type.
 
-The adaptation pipeline in `NebulaPCDDecoder::decode_typed()` ([nebula_decoder.cpp](../src/bag_converter/src/nebula_decoder.cpp)):
+### 10.1 How NebulaPackets → SeyondScan conversion works
 
-1. **Packet validation**: Check magic number (`0x176A`) and minimum size (60 bytes). Skip invalid packets.
-2. **Protocol v1 → v2 compatibility**: Insert 16 zero bytes at offset 54 and update the packet size field for v1 packets. SeyondScan packets are already v2.
-3. **Packet type classification**: After v1 compat, inspect the `InnoDataPacket.type` field. AngleHV calibration packets (`CHECK_ANGLEHV_TABLE_DATA`) are tagged as `PACKET_TYPE_HVTABLE`; data packets as `PACKET_TYPE_POINTS`. Non-data packets (MESSAGE, MESSAGE_LOG) are filtered out.
-4. **Delegation**: Build a `SeyondScan` message from the adapted packets and call `SeyondPCDDecoder::decode_typed()`.
+The conversion is implemented in `nebula_packets_to_seyond_scan()` ([nebula_decoder.cpp](../src/bag_converter/src/nebula_decoder.cpp)). It iterates over `input.packets` in order and builds a `SeyondScan` with `header` (from `input.header` plus the given `frame_id`) and a `packets` array of `SeyondPacket` messages. Each input packet is handled as follows.
 
-This approach reuses all decoding logic (coordinate conversion, intensity scaling, AngleHV table handling, en_xyzit metadata) from the single `SeyondPCDDecoder` implementation.
+**Input**: One `NebulaPacket` (binary `data` + `stamp`). No explicit type field.
+
+**Per-packet flow**:
+
+1. **Empty packet**  
+   If `nebula_pkt.data.empty()`, the packet is skipped (not added to the scan).
+
+2. **First packet: Robin W prepended calibration (nebula_drs)**  
+   When publishing NebulaPackets for Robin W, nebula_drs inserts the **raw calibration string** from `GetCalibrationString()` as the first packet’s `data` — it does **not** build a valid `InnoDataPacket` header (magic/type may be uninitialized).  
+   The converter only treats the first packet as this blob when **both** (1) `data.size() == sizeof(InnoDataPacket) + sizeof(InnoAngleHVTable)` and (2) the header is **not** already a valid data packet (see below). Then it:
+
+   - Overwrites the first `sizeof(InnoDataPacket)` bytes to form a valid header: `magic_number = kInnoMagicNumberDataPacket`, `type = INNO_ROBINW_ITEM_TYPE_ANGLEHV_TABLE`, `common.size`, `item_number`, `item_size`, `is_first_sub_frame`, `is_last_sub_frame`, `sub_idx`.
+   - Appends a `SeyondPacket` with `type = PACKET_TYPE_HVTABLE`, `stamp = nebula_pkt.stamp`, and the (possibly modified) `data`.  
+     Then continues to the next input packet.
+
+   **Safer detection**: To avoid false positives (e.g. a same-size POINTS packet), the code first reads `magic_number` and `InnoDataPacket.type`. If `magic_number == kInnoMagicNumberDataPacket` and `type` is already `INNO_ROBINW_ITEM_TYPE_ANGLEHV_TABLE`, the packet is emitted as HVTABLE **without** overwriting the header. If `magic_number != kInnoMagicNumberDataPacket`, the packet is treated as the raw blob and the header is fixed. If the magic is valid but the type is something else (e.g. POINTS), the packet is **not** treated as HVTABLE; it falls through to the normal path and is classified by type. This way we never overwrite a valid packet or mis-identify another packet type as the calibration blob.
+
+3. **All other packets: magic and type from binary**
+   - If `data.size() < sizeof(InnoCommonVersion)`, the packet is skipped and an INFO log is emitted (invalid or unknown magic).
+   - Read `magic_number` from the first bytes (SDK: `InnoCommonVersion`).
+     - If `magic == kInnoMagicNumberStatusPacket`: skip and log (status packet).
+     - If `magic != kInnoMagicNumberDataPacket`: skip and log (invalid).
+   - **Protocol v1 → v2**: If `data.size() >= sizeof(InnoDataPacketV1)` and `major_version == InnoPacketV1Adapt::kInnoProtocolMajorV1`, insert 16 zero bytes after the v1 header (SDK: `kMemorryFrontGap`), then set `common.size`, `major_version`, and `minor_version` to the v2 values.
+   - If after that `data.size() < sizeof(InnoDataPacket)`, skip the packet.
+   - Read `InnoDataPacket.type`. If `type` is `INNO_ITEM_TYPE_MESSAGE` or `INNO_ITEM_TYPE_MESSAGE_LOG`, skip (no SeyondPacket added).
+   - **Classify**: If `CHECK_ANGLEHV_TABLE_DATA(pkt->type)` then emit `PACKET_TYPE_HVTABLE`, else emit `PACKET_TYPE_POINTS`.
+   - Append a `SeyondPacket` with that `type`, `stamp = nebula_pkt.stamp`, and the (possibly v1-compat modified) `data`.
+
+**Output**: A `SeyondScan` whose `packets` array contains only HVTABLE and POINTS packets, in the same order as the accepted input packets (with skipped packets omitted). No explicit reordering is done; e.g. a prepended HVTABLE at index 0 remains first.
+
+### 10.2 Summary of conversion steps (checklist)
+
+1. **Packet validation**: For non–first packets (or first packet not matching Robin W table size), check magic (`kInnoMagicNumberDataPacket` / `kInnoMagicNumberStatusPacket`). Skip status and invalid packets. No minimum size beyond what is needed to read the magic.
+2. **Prepended calibration**: First packet with size `sizeof(InnoDataPacket) + sizeof(InnoAngleHVTable)` and **invalid header** (magic ≠ data packet) is normalized to a valid HVTABLE packet and emitted as `PACKET_TYPE_HVTABLE`. If the header is already valid (magic + type ANGLEHV_TABLE), it is emitted as HVTABLE without overwriting. If the header is valid but type is different, the packet is handled by the normal path.
+3. **Protocol v1 → v2**: For remaining data packets with `major_version == 1`, insert 16 zero bytes after the v1 header and update size/version (SDK: `InnoPacketV1Adapt`).
+4. **Packet type classification**: After v1 compat, use `InnoDataPacket.type`: `CHECK_ANGLEHV_TABLE_DATA` → `PACKET_TYPE_HVTABLE`, others (except MESSAGE/MESSAGE_LOG) → `PACKET_TYPE_POINTS`. MESSAGE and MESSAGE_LOG are not added to the scan.
+5. **Order**: Packet order from NebulaPackets is preserved. `SeyondPCDDecoder` does not assume HVTABLE at a fixed position; it scans all packets for HVTABLE to initialize the angle table, then processes POINTS.
+
+### 10.3 How the differences are absorbed
+
+- **HVTABLE position**: NebulaPackets has it first; SeyondScan from the driver has it last. The decoder is order-agnostic, so no reordering is needed.
+- **Raw prepended calibration**: Recognized by size and header fixed in place so it becomes a valid `PACKET_TYPE_HVTABLE` packet.
+- **Explicit type field**: Inferred from binary (magic + `InnoDataPacket.type` or first-packet size) and set on each `SeyondPacket.type`.
+- **v1 compat and non-data filtering**: Applied during the conversion so the output matches what SeyondPCDDecoder expects. Decoding logic (coordinate conversion, intensity scaling, AngleHV handling) is shared via a single `SeyondPCDDecoder` implementation.
+
+### 10.4 Ideas for safer raw AngleHV table detection
+
+The first-packet Robin W calibration blob is currently detected by: (1) index 0, (2) size `sizeof(InnoDataPacket) + sizeof(InnoAngleHVTable)`, and (3) **invalid header** (`magic_number != kInnoMagicNumberDataPacket`). That avoids overwriting a valid HVTABLE and avoids mis-classifying a same-size POINTS packet as HVTABLE. Further hardening ideas:
+
+| Idea                             | Description                                                                                                                                                                                      | Pros / cons                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| **Magic check (implemented)**    | Only treat as raw blob when `magic_number != kInnoMagicNumberDataPacket`. Valid HVTABLE is emitted as-is; valid same-size other type falls through to normal path.                               | No overwrite of valid packets; minimal change.                                               |
+| **Type check (implemented)**     | When magic is valid, read `InnoDataPacket.type`. If already `INNO_ROBINW_ITEM_TYPE_ANGLEHV_TABLE`, emit as HVTABLE without fix. If another type, fall through so it is classified as POINTS etc. | Prevents same-size POINTS from being turned into HVTABLE.                                    |
+| **Body signature**               | If the SDK defines a magic or fixed bytes at the start of `InnoAngleHVTable`, check bytes at offset `sizeof(InnoDataPacket)` and only treat as blob when the signature matches.                  | Stronger guarantee that the payload is really an angle table; depends on SDK layout.         |
+| **CRC / checksum**               | If the calibration blob or table has a known CRC/checksum in the payload, verify it before fixing.                                                                                               | Integrity check; requires SDK spec and may differ for raw HTTP response vs SDK-built packet. |
+| **Heuristic “looks like table”** | e.g. check that values at known offsets in the table body are in expected ranges (e.g. angles in [-π, π]).                                                                                       | Can reduce false positives; fragile if format or scale changes.                              |

@@ -3,10 +3,8 @@
  *
  *  License: Apache License
  *
- *  NebulaPCDDecoder class definition for bag_converter package
- *
- *  Decodes NebulaPackets (nebula_drs) by adapting them to SeyondPCDDecoder,
- *  bypassing the nebula driver for better performance.
+ *  NebulaPCDDecoder: thin wrapper around SeyondPCDDecoder that converts
+ *  NebulaPackets to SeyondScan internally and delegates point decoding.
  */
 
 #ifndef BAG_CONVERTER__NEBULA_DECODER_HPP
@@ -15,6 +13,8 @@
 #include "base_decoder.hpp"
 #include "point_types.hpp"
 #include "seyond_decoder.hpp"
+
+#include <bag_converter/msg/seyond_scan.hpp>
 
 #include <nebula_msgs/msg/nebula_packets.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -38,6 +38,15 @@ inline constexpr double min_range = 0.3;
 inline constexpr double max_range = 200.0;
 }  // namespace defaults
 
+/**
+ * @brief Convert NebulaPackets to SeyondScan (data packet filtering and v1 compat).
+ * @param input Raw packets from nebula_drs
+ * @param frame_id Frame ID for the output scan header
+ * @return SeyondScan with HVTABLE and POINTS packets only, or empty packets if none
+ */
+bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
+  const nebula_msgs::msg::NebulaPackets & input, const std::string & frame_id);
+
 // Configuration for the decoder
 struct NebulaPCDDecoderConfig
 {
@@ -54,15 +63,10 @@ struct NebulaPCDDecoderConfig
 };
 
 /**
- * @brief NebulaPCDDecoder that adapts NebulaPackets for SeyondPCDDecoder
+ * @brief Thin wrapper around SeyondPCDDecoder.
  *
- * Instead of using the nebula driver (which copies every packet, tracks frame
- * boundaries, and requires an extra NebulaPoint -> OutputPointT conversion),
- * this class directly adapts NebulaPackets to the SeyondPCDDecoder path:
- *   1. Detect AngleHV calibration packets from binary header
- *   2. Apply protocol v1 compatibility (16-byte header padding) if needed
- *   3. Filter non-data packets
- *   4. Delegate point decoding to SeyondPCDDecoder's convert_and_parse()
+ * Converts NebulaPackets to SeyondScan internally (via nebula_packets_to_seyond_scan)
+ * and delegates point cloud decoding to SeyondPCDDecoder.
  *
  * @tparam OutputPointT The point type used for output point cloud
  */

@@ -134,9 +134,9 @@ void SeyondPCDDecoder<OutputPointT>::convert_and_parse(
     // Directly parse xyz point cloud data
     data_packet_parse(pkt, cloud);
   } else {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("bag_converter.decoder.seyond"), "Packet type %d is not supported",
-      pkt->type);
+    RCLCPP_INFO(
+      rclcpp::get_logger("bag_converter.decoder.seyond"),
+      "Skipping packet (type %d): not a point cloud packet", pkt->type);
   }
 }
 

@@ -341,6 +341,77 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
   throw std::logic_error("Unhandled DriverType in create_decoder");
 }
 
+enum class ProcessMessageResult { NotDecodable, Decoded, Skipped, Error };
+
+/**
+ * Process one message for a LiDAR packet topic (NebulaPackets or SeyondScan).
+ * Creates decoder on first use, decodes, applies timescale/transform, writes PointCloud2.
+ * @return NotDecodable if topic_type is not a decodable type; caller should write raw message.
+ */
+template <typename PointT>
+ProcessMessageResult process_lidar_message(
+  const std::string & topic_name, const std::string & topic_type,
+  const rclcpp::SerializedMessage & serialized_msg, const rclcpp::Time & log_time,
+  const BagConverterConfig & config,
+  std::map<std::string, std::unique_ptr<decoder::BasePCDDecoder>> & decoders,
+  std::map<std::string, BagConverterStats> & conversion_stats,
+  tf_transformer::TfTransformer * transformer, rosbag2_cpp::Writer & writer,
+  rclcpp::Serialization<sensor_msgs::msg::PointCloud2> & pc2_serializer)
+{
+  const bool is_nebula = (topic_type == "nebula_msgs/msg/NebulaPackets");
+  const bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
+  if (!is_nebula && !is_seyond) {
+    return ProcessMessageResult::NotDecodable;
+  }
+
+  if (decoders.find(topic_name) == decoders.end()) {
+    const DriverType driver_type = is_nebula ? DriverType::kNebula : DriverType::kSeyond;
+    decoders[topic_name] =
+      create_decoder<PointT>(driver_type, topic_name, config, conversion_stats);
+  }
+
+  auto & dec = decoders[topic_name];
+  auto pcd_msg = dec->decode(serialized_msg);
+
+  if (!pcd_msg) {
+    return ProcessMessageResult::Decoded;  // nothing to write, no stats change
+  }
+
+  const size_t num_points = pcd_msg->width * pcd_msg->height;
+  if (num_points < defaults::min_points_per_scan) {
+    RCLCPP_INFO(g_logger, "Status packets detected (skipped decoding this message)");
+    conversion_stats[topic_name].skipped_count++;
+    return ProcessMessageResult::Skipped;
+  }
+
+  if (config.timescale_correction) {
+    const std::uint64_t sensor_time_ns =
+      static_cast<std::uint64_t>(pcd_msg->header.stamp.sec) * 1000000000 +
+      static_cast<std::uint64_t>(pcd_msg->header.stamp.nanosec);
+    const std::uint64_t sensor_time_ns_corrected = timescale::correct_timescale(
+      sensor_time_ns, log_time.nanoseconds(), config.timescale_correction_ref);
+    if (sensor_time_ns_corrected != sensor_time_ns) {
+      pcd_msg->header.stamp.sec = sensor_time_ns_corrected / 1000000000;
+      pcd_msg->header.stamp.nanosec = sensor_time_ns_corrected % 1000000000;
+    }
+  }
+
+  if (transformer) {
+    if (!transformer->transform(*pcd_msg, config.frame)) {
+      RCLCPP_ERROR(g_logger, "TF transform failed for frame: %s", pcd_msg->header.frame_id.c_str());
+      return ProcessMessageResult::Error;
+    }
+  }
+
+  auto pc2_serialized = std::make_shared<rclcpp::SerializedMessage>();
+  pc2_serializer.serialize_message(pcd_msg.get(), pc2_serialized.get());
+  writer.write(
+    pc2_serialized, conversion_stats[topic_name].output_topic, "sensor_msgs/msg/PointCloud2",
+    log_time);
+  conversion_stats[topic_name].decoded_count++;
+  return ProcessMessageResult::Decoded;
+}
+
 template <typename PointT>
 BagConverterResultStatus run_impl(const BagConverterConfig & config)
 {
@@ -542,71 +613,23 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
 
     if (!is_nebula && !is_seyond) {
-      // Other messages: pass through
       writer.write(bag_msg);
-
       if (message_count % defaults::progress_log_interval == 0) {
         RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
       }
       continue;
     }
 
-    // Keep original if requested
     if (config.keep_original_topics) {
       writer.write(bag_msg);
     }
-
-    // Create decoder on first encounter
-    if (decoders.find(topic_name) == decoders.end()) {
-      DriverType driver_type = is_nebula ? DriverType::kNebula : DriverType::kSeyond;
-      decoders[topic_name] =
-        create_decoder<PointT>(driver_type, topic_name, config, conversion_stats);
-    }
-
-    // Decode using polymorphic interface
     rclcpp::SerializedMessage serialized_msg(*bag_msg->serialized_data);
-    auto & decoder = decoders[topic_name];
-    auto pcd_msg = decoder->decode(serialized_msg);
-
-    if (pcd_msg) {
-      // Skip status packets (messages with too few points)
-      const size_t num_points = pcd_msg->width * pcd_msg->height;
-      if (num_points < defaults::min_points_per_scan) {
-        RCLCPP_INFO(g_logger, "Status packets detected (skipped decoding this message)");
-        conversion_stats[topic_name].skipped_count++;
-        continue;
-      }
-
-      if (config.timescale_correction) {
-        const std::uint64_t sensor_time_ns =
-          static_cast<std::uint64_t>(pcd_msg->header.stamp.sec) * 1000000000 +
-          static_cast<std::uint64_t>(pcd_msg->header.stamp.nanosec);
-        const std::uint64_t sensor_time_ns_corrected = timescale::correct_timescale(
-          sensor_time_ns, rclcpp::Time(bag_msg->time_stamp).nanoseconds(),
-          config.timescale_correction_ref);
-        if (sensor_time_ns_corrected != sensor_time_ns) {
-          pcd_msg->header.stamp.sec = sensor_time_ns_corrected / 1000000000;
-          pcd_msg->header.stamp.nanosec = sensor_time_ns_corrected % 1000000000;
-        }
-      }
-
-      if (transformer) {
-        if (!transformer->transform(*pcd_msg, config.frame)) {
-          RCLCPP_ERROR(
-            g_logger, "TF transform failed for frame: %s", pcd_msg->header.frame_id.c_str());
-          return BagConverterResultStatus::kError;
-        }
-      }
-
-      auto pc2_msg_serialized = std::make_shared<rclcpp::SerializedMessage>();
-      pc2_serializer.serialize_message(pcd_msg.get(), pc2_msg_serialized.get());
-
-      const auto log_time = rclcpp::Time(bag_msg->time_stamp);
-      writer.write(
-        pc2_msg_serialized, conversion_stats[topic_name].output_topic,
-        "sensor_msgs/msg/PointCloud2", log_time);
-
-      conversion_stats[topic_name].decoded_count++;
+    const auto log_time = rclcpp::Time(bag_msg->time_stamp);
+    const auto result = process_lidar_message<PointT>(
+      topic_name, topic_type, serialized_msg, log_time, config, decoders, conversion_stats,
+      transformer.get(), writer, pc2_serializer);
+    if (result == ProcessMessageResult::Error) {
+      return BagConverterResultStatus::kError;
     }
 
     if (message_count % defaults::progress_log_interval == 0) {
@@ -1002,72 +1025,24 @@ static int64_t merge_and_convert_group(
     }
     const auto & topic_type = type_it->second;
 
-    bool is_nebula = (topic_type == "nebula_msgs/msg/NebulaPackets");
-    bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
+    const bool is_nebula = (topic_type == "nebula_msgs/msg/NebulaPackets");
+    const bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
 
     if (is_nebula || is_seyond) {
-      // Keep original if requested
       if (config.keep_original_topics) {
         writer.write(entry.message);
       }
-
-      // Create decoder lazily
-      if (decoders.find(topic_name) == decoders.end()) {
-        DriverType driver_type = is_nebula ? DriverType::kNebula : DriverType::kSeyond;
-        decoders[topic_name] =
-          create_decoder<PointT>(driver_type, topic_name, config, conversion_stats);
-      }
-
-      // Decode
       rclcpp::SerializedMessage serialized_msg(*entry.message->serialized_data);
-      auto & dec = decoders[topic_name];
-      auto pointcloud_msg = dec->decode(serialized_msg);
-
-      if (pointcloud_msg) {
-        const size_t num_points = pointcloud_msg->width * pointcloud_msg->height;
-        if (num_points < defaults::min_points_per_scan) {
-          RCLCPP_INFO(g_logger, "Status packets detected (skipped decoding this message)");
-          conversion_stats[topic_name].skipped_count++;
-        } else {
-          // Timescale correction
-          if (config.timescale_correction) {
-            const std::uint64_t sensor_time_ns =
-              static_cast<std::uint64_t>(pointcloud_msg->header.stamp.sec) * 1000000000 +
-              static_cast<std::uint64_t>(pointcloud_msg->header.stamp.nanosec);
-            const std::uint64_t sensor_time_ns_corrected = timescale::correct_timescale(
-              sensor_time_ns, rclcpp::Time(entry.message->time_stamp).nanoseconds(),
-              config.timescale_correction_ref);
-            if (sensor_time_ns_corrected != sensor_time_ns) {
-              pointcloud_msg->header.stamp.sec = sensor_time_ns_corrected / 1000000000;
-              pointcloud_msg->header.stamp.nanosec = sensor_time_ns_corrected % 1000000000;
-            }
-          }
-
-          // TF transform
-          if (transformer) {
-            if (!transformer->transform(*pointcloud_msg, config.frame)) {
-              RCLCPP_ERROR(
-                g_logger, "TF transform failed for frame: %s",
-                pointcloud_msg->header.frame_id.c_str());
-              fs::remove_all(temp_dir, ec);
-              return -1;
-            }
-          }
-
-          // Serialize and write
-          auto pc2_serialized = std::make_shared<rclcpp::SerializedMessage>();
-          pc2_serializer.serialize_message(pointcloud_msg.get(), pc2_serialized.get());
-
-          const auto log_time = rclcpp::Time(entry.message->time_stamp);
-          writer.write(
-            pc2_serialized, conversion_stats[topic_name].output_topic,
-            "sensor_msgs/msg/PointCloud2", log_time);
-
-          conversion_stats[topic_name].decoded_count++;
-        }
+      const auto log_time = rclcpp::Time(entry.message->time_stamp);
+      const auto result = process_lidar_message<PointT>(
+        topic_name, topic_type, serialized_msg, log_time, config, decoders, conversion_stats,
+        transformer.get(), writer, pc2_serializer);
+      if (result == ProcessMessageResult::Error) {
+        writer.close();
+        fs::remove_all(temp_dir, ec);
+        return -1;
       }
     } else {
-      // Non-decodable topic: pass through
       writer.write(entry.message);
     }
 
