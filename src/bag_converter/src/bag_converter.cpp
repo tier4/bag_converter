@@ -12,6 +12,9 @@
 #include "merge.hpp"
 #include "tf_transformer.hpp"
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
@@ -25,6 +28,24 @@ static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 
 namespace bag_converter
 {
+
+/**
+ * @brief Drop page cache for a file using posix_fadvise(POSIX_FADV_DONTNEED).
+ *
+ * Opens the file with a separate file descriptor, advises the kernel that the
+ * cached pages are no longer needed, then closes the descriptor. This works
+ * regardless of whether another FD (e.g. from rosbag2) is still open on the
+ * same file — the advisory applies to the underlying page cache.
+ */
+static void drop_page_cache(const std::string & path)
+{
+  int fd = ::open(path.c_str(), O_RDONLY);
+  if (fd < 0) {
+    return;
+  }
+  ::posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
+  ::close(fd);
+}
 
 /// Extract frame_id from topic name by taking the parent path segment.
 /// e.g. "/sensing/lidar/front/nebula_packets" -> "lidar_front"
@@ -580,6 +601,9 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       return BagConverterResultStatus::kError;
     }
     RCLCPP_INFO(g_logger, "TF data loaded");
+
+    // Drop page cache accumulated during TF pre-load pass
+    drop_page_cache(config.src_bag_path);
   }
 
   // Serializer for output PointCloud2
@@ -648,6 +672,10 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
   if (!finalize_output_bag(temp_dir, dst_path)) {
     return BagConverterResultStatus::kError;
   }
+
+  // Drop page cache for input and output files
+  drop_page_cache(config.src_bag_path);
+  drop_page_cache(dst_path.string());
 
   RCLCPP_INFO(g_logger, "Output written to: %s", dst_path.c_str());
   return BagConverterResultStatus::kSuccess;
@@ -1070,6 +1098,12 @@ static int64_t merge_and_convert_group(
   if (!finalize_output_bag(temp_dir, output_path)) {
     return -1;
   }
+
+  // Drop page cache for all input and output files
+  for (const auto & bag_path : bag_files) {
+    drop_page_cache(bag_path.string());
+  }
+  drop_page_cache(output_path.string());
 
   return message_count;
 }
