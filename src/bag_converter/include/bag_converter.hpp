@@ -53,6 +53,9 @@ inline constexpr bool keep_original_topics = false;
 // Progress logging interval
 inline constexpr size_t progress_log_interval = 1000;
 
+// Page cache drop interval (in messages)
+inline constexpr size_t page_cache_drop_interval = 10000;
+
 }  // namespace defaults
 
 /**

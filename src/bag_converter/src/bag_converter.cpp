@@ -625,6 +625,9 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       if (message_count % defaults::progress_log_interval == 0) {
         RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
       }
+      if (message_count % defaults::page_cache_drop_interval == 0) {
+        cache_guard.drop();
+      }
       continue;
     }
 
@@ -642,6 +645,9 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
 
     if (message_count % defaults::progress_log_interval == 0) {
       RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
+    }
+    if (message_count % defaults::page_cache_drop_interval == 0) {
+      cache_guard.drop();
     }
   }
 
@@ -1066,6 +1072,9 @@ static int64_t merge_and_convert_group(
     ++message_count;
     if (message_count % defaults::progress_log_interval == 0) {
       RCLCPP_INFO(g_logger, "  Processed %ld messages...", message_count);
+    }
+    if (message_count % defaults::page_cache_drop_interval == 0) {
+      cache_guard.drop();
     }
 
     // Read next message from the same reader

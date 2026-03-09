@@ -49,12 +49,7 @@ class PageCacheGuard
 {
 public:
   PageCacheGuard() = default;
-  ~PageCacheGuard()
-  {
-    for (const auto & p : paths_) {
-      fadvise_drop_page_cache(p);
-    }
-  }
+  ~PageCacheGuard() { drop(); }
 
   PageCacheGuard(const PageCacheGuard &) = delete;
   PageCacheGuard & operator=(const PageCacheGuard &) = delete;
@@ -62,6 +57,13 @@ public:
   PageCacheGuard & operator=(PageCacheGuard &&) = delete;
 
   void track(const std::string & path) { paths_.push_back(path); }
+
+  void drop()
+  {
+    for (const auto & p : paths_) {
+      fadvise_drop_page_cache(p);
+    }
+  }
 
 private:
   std::vector<std::string> paths_;
