@@ -12,8 +12,10 @@
 #include "merge.hpp"
 #include "tf_transformer.hpp"
 
+#ifdef __linux__
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <filesystem>
@@ -31,12 +33,16 @@ namespace bag_converter
 
 void drop_page_cache(const std::string & path)
 {
+#ifdef __linux__
   int fd = ::open(path.c_str(), O_RDONLY);
   if (fd < 0) {
     return;
   }
   ::posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
   ::close(fd);
+#else
+  (void)path;
+#endif
 }
 
 /// Extract frame_id from topic name by taking the parent path segment.
