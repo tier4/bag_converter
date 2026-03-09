@@ -29,15 +29,7 @@ static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 namespace bag_converter
 {
 
-/**
- * @brief Drop page cache for a file using posix_fadvise(POSIX_FADV_DONTNEED).
- *
- * Opens the file with a separate file descriptor, advises the kernel that the
- * cached pages are no longer needed, then closes the descriptor. This works
- * regardless of whether another FD (e.g. from rosbag2) is still open on the
- * same file — the advisory applies to the underlying page cache.
- */
-static void drop_page_cache(const std::string & path)
+void drop_page_cache(const std::string & path)
 {
   int fd = ::open(path.c_str(), O_RDONLY);
   if (fd < 0) {

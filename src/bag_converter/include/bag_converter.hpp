@@ -192,6 +192,18 @@ std::vector<std::filesystem::path> find_bag_files(const std::filesystem::path & 
 bool finalize_output_bag(
   const std::filesystem::path & temp_dir, const std::filesystem::path & dst_path);
 
+/**
+ * @brief Drop page cache for a file using posix_fadvise(POSIX_FADV_DONTNEED).
+ *
+ * Opens the file with a separate file descriptor, advises the kernel that the
+ * cached pages are no longer needed, then closes the descriptor. This works
+ * regardless of whether another FD (e.g. from rosbag2) is still open on the
+ * same file — the advisory applies to the underlying page cache.
+ *
+ * @param path Path to the file whose cached pages should be evicted
+ */
+void drop_page_cache(const std::string & path);
+
 }  // namespace bag_converter
 
 #endif  // BAG_CONVERTER__BAG_CONVERTER_HPP
