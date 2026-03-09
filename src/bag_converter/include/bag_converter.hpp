@@ -10,6 +10,7 @@
 #ifndef BAG_CONVERTER__BAG_CONVERTER_HPP
 #define BAG_CONVERTER__BAG_CONVERTER_HPP
 
+#include "memory_management.hpp"
 #include "nebula_decoder.hpp"
 #include "point_types.hpp"
 #include "seyond_decoder.hpp"
@@ -205,18 +206,6 @@ bool finalize_output_bag(
  * @return 0 on success, non-zero on failure
  */
 int run_merge_and_convert(const BagConverterConfig & config);
-
-/**
- * @brief Drop page cache for a file using posix_fadvise(POSIX_FADV_DONTNEED).
- *
- * Opens the file with a separate file descriptor, advises the kernel that the
- * cached pages are no longer needed, then closes the descriptor. This works
- * regardless of whether another FD (e.g. from rosbag2) is still open on the
- * same file — the advisory applies to the underlying page cache.
- *
- * @param path Path to the file whose cached pages should be evicted
- */
-void drop_page_cache(const std::string & path);
 
 }  // namespace bag_converter
 

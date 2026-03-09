@@ -200,6 +200,7 @@ static int64_t merge_group(
     rosbag2_storage::StorageOptions storage_options_in;
     storage_options_in.uri = bag_files[i].string();
     reader->open(storage_options_in);
+    memory_management::fadvise_sequential_access(bag_files[i].string());
 
     if (reader->has_next()) {
       auto msg = reader->read_next();
