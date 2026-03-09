@@ -64,6 +64,7 @@ rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} rosidl_type
 # Build unified bag_converter executable
 add_executable(bag_converter_bin
   src/bag_converter.cpp
+  src/memory_management.cpp
   src/merge.cpp
   src/seyond_decoder.cpp
   src/nebula_decoder.cpp

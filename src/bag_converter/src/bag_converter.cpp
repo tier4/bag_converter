@@ -9,13 +9,9 @@
 
 #include "bag_converter.hpp"
 
+#include "memory_management.hpp"
 #include "merge.hpp"
 #include "tf_transformer.hpp"
-
-#ifdef __linux__
-#include <fcntl.h>
-#include <unistd.h>
-#endif
 
 #include <algorithm>
 #include <filesystem>
@@ -30,20 +26,6 @@ static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 
 namespace bag_converter
 {
-
-void drop_page_cache(const std::string & path)
-{
-#ifdef __linux__
-  int fd = ::open(path.c_str(), O_RDONLY);
-  if (fd < 0) {
-    return;
-  }
-  ::posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
-  ::close(fd);
-#else
-  (void)path;
-#endif
-}
 
 /// Extract frame_id from topic name by taking the parent path segment.
 /// e.g. "/sensing/lidar/front/nebula_packets" -> "lidar_front"
@@ -475,10 +457,15 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
   rosbag2_cpp::Reader reader;
   try {
     reader.open(storage_options_in);
+    memory_management::fadvise_sequential_access(config.src_bag_path);
   } catch (const std::exception & e) {
     RCLCPP_ERROR(g_logger, "Error opening input bag: %s", e.what());
     return BagConverterResultStatus::kError;
   }
+
+  // RAII guard: frees page cache for tracked files on any exit path
+  memory_management::PageCacheGuard cache_guard;
+  cache_guard.track(config.src_bag_path);
 
   const auto bag_metadata = reader.get_metadata();
 
@@ -539,6 +526,7 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     RCLCPP_ERROR(g_logger, "Error opening output bag: %s", e.what());
     return BagConverterResultStatus::kError;
   }
+  cache_guard.track(dst_path.string());
 
   // Create output topics based on input metadata
   std::set<std::string> created_topics;
@@ -583,6 +571,7 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     RCLCPP_INFO(g_logger, "Loading TF data (%s mode)...", tf_mode_str);
     rosbag2_cpp::Reader tf_reader;
     tf_reader.open(storage_options_in);
+    memory_management::fadvise_sequential_access(config.src_bag_path);
     while (tf_reader.has_next()) {
       auto msg = tf_reader.read_next();
       auto it = topic_types.find(msg->topic_name);
@@ -599,9 +588,6 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       return BagConverterResultStatus::kError;
     }
     RCLCPP_INFO(g_logger, "TF data loaded");
-
-    // Drop page cache accumulated during TF pre-load pass
-    drop_page_cache(config.src_bag_path);
   }
 
   // Serializer for output PointCloud2
@@ -670,10 +656,6 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
   if (!finalize_output_bag(temp_dir, dst_path)) {
     return BagConverterResultStatus::kError;
   }
-
-  // Drop page cache for input and output files
-  drop_page_cache(config.src_bag_path);
-  drop_page_cache(dst_path.string());
 
   RCLCPP_INFO(g_logger, "Output written to: %s", dst_path.c_str());
   return BagConverterResultStatus::kSuccess;
@@ -893,6 +875,13 @@ static int64_t merge_and_convert_group(
   const std::vector<fs::path> & bag_files, const fs::path & output_path,
   const std::string & storage_identifier, const BagConverterConfig & config)
 {
+  // RAII guard: frees page cache for all tracked files on any exit path
+  memory_management::PageCacheGuard cache_guard;
+  for (const auto & bag_path : bag_files) {
+    cache_guard.track(bag_path.string());
+  }
+  cache_guard.track(output_path.string());
+
   // 1. Collect topic union
   auto topic_union = merge::collect_topic_union(bag_files);
   if (!topic_union.has_value()) {
@@ -937,6 +926,7 @@ static int64_t merge_and_convert_group(
       opts.uri = bag_path.string();
       rosbag2_cpp::Reader tf_reader;
       tf_reader.open(opts);
+      memory_management::fadvise_sequential_access(bag_path.string());
       while (tf_reader.has_next()) {
         auto msg = tf_reader.read_next();
         auto it = topic_types.find(msg->topic_name);
@@ -1021,6 +1011,7 @@ static int64_t merge_and_convert_group(
     rosbag2_storage::StorageOptions storage_options_in;
     storage_options_in.uri = bag_files[i].string();
     reader->open(storage_options_in);
+    memory_management::fadvise_sequential_access(bag_files[i].string());
 
     if (reader->has_next()) {
       auto msg = reader->read_next();
@@ -1096,12 +1087,6 @@ static int64_t merge_and_convert_group(
   if (!finalize_output_bag(temp_dir, output_path)) {
     return -1;
   }
-
-  // Drop page cache for all input and output files
-  for (const auto & bag_path : bag_files) {
-    drop_page_cache(bag_path.string());
-  }
-  drop_page_cache(output_path.string());
 
   return message_count;
 }
