@@ -115,6 +115,13 @@ struct BagConverterConfig
 };
 
 /**
+ * @brief Extract frame_id from topic name by taking the parent path segment
+ * @param topic_name The topic name (e.g., "/sensing/lidar/front/nebula_packets")
+ * @return frame_id string (e.g., "lidar_front")
+ */
+std::string extract_frame_id(const std::string & topic_name);
+
+/**
  * @brief Generate output topic name from input topic name
  * @param input_topic The input topic name
  * @param input_suffix The suffix to replace (e.g., "/nebula_packets")
@@ -191,6 +198,25 @@ std::vector<std::filesystem::path> find_bag_files(const std::filesystem::path & 
  */
 bool finalize_output_bag(
   const std::filesystem::path & temp_dir, const std::filesystem::path & dst_path);
+
+/**
+ * @brief Run merge-and-convert pipeline
+ * @param config The converter configuration (with merge=true and input_dirs populated)
+ * @return 0 on success, non-zero on failure
+ */
+int run_merge_and_convert(const BagConverterConfig & config);
+
+/**
+ * @brief Drop page cache for a file using posix_fadvise(POSIX_FADV_DONTNEED).
+ *
+ * Opens the file with a separate file descriptor, advises the kernel that the
+ * cached pages are no longer needed, then closes the descriptor. This works
+ * regardless of whether another FD (e.g. from rosbag2) is still open on the
+ * same file — the advisory applies to the underlying page cache.
+ *
+ * @param path Path to the file whose cached pages should be evicted
+ */
+void drop_page_cache(const std::string & path);
 
 }  // namespace bag_converter
 
