@@ -155,6 +155,9 @@ private:
   // Whether intensity needs to be scaled from [0, 4095] to [0, 255]
   bool scale_intensity_12bit_ = false;
 
+  // Reusable point cloud buffer (avoids per-scan heap allocation)
+  pcl::PointCloud<OutputPointT> cloud_;
+
   static constexpr double us_in_second_c = 1000000.0;
   static constexpr double ten_us_in_second_c = 100000.0;
 };

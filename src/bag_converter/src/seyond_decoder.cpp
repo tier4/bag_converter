@@ -37,11 +37,13 @@ template <typename OutputPointT>
 sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_typed(
   const bag_converter::msg::SeyondScan & input)
 {
-  // Create point cloud for processing
-  pcl::PointCloud<OutputPointT> cloud;
-  cloud.header.frame_id = input.header.frame_id;
-  cloud.header.stamp = input.header.stamp.sec * 1000000ULL + input.header.stamp.nanosec / 1000;
-  cloud.points.reserve(defaults::initial_points_capacity);
+  // Reuse member point cloud buffer: clear points but keep allocated memory
+  cloud_.points.clear();
+  cloud_.header.frame_id = input.header.frame_id;
+  cloud_.header.stamp = input.header.stamp.sec * 1000000ULL + input.header.stamp.nanosec / 1000;
+  if (cloud_.points.capacity() < defaults::initial_points_capacity) {
+    cloud_.points.reserve(defaults::initial_points_capacity);
+  }
 
   // Initialize angle HV table if not already initialized
   if (!anglehv_table_init_) {
@@ -74,12 +76,12 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
   for (const auto & packet : input.packets) {
     if (
       packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS && !packet.data.empty()) {
-      process_packet(packet, cloud);
+      process_packet(packet, cloud_);
     }
   }
 
   // Check if point cloud is empty
-  if (cloud.points.empty()) {
+  if (cloud_.points.empty()) {
     RCLCPP_WARN(
       rclcpp::get_logger("bag_converter.decoder.seyond"),
       "Decoded point cloud is empty (no points found in scan)");
@@ -87,11 +89,11 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
 
   // Create PointCloud2 message
   auto pc2_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
-  pcl::toROSMsg(cloud, *pc2_msg);
+  pcl::toROSMsg(cloud_, *pc2_msg);
 
   // Set header timestamp from input message
   pc2_msg->header.stamp = input.header.stamp;
-  pc2_msg->header.frame_id = cloud.header.frame_id;
+  pc2_msg->header.frame_id = cloud_.header.frame_id;
 
   return pc2_msg;
 }
