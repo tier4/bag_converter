@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <queue>
 #include <set>
@@ -61,6 +62,28 @@ void print_summary(const std::map<std::string, BagConverterStats> & conversion_s
   RCLCPP_INFO(g_logger, "========================================");
 }
 
+static std::string capitalize(const std::string & s)
+{
+  std::string result = s;
+  if (!result.empty()) {
+    result[0] = static_cast<char>(std::toupper(result[0]));
+  }
+  return result;
+}
+
+std::string create_compression_config(const std::string & comp_algo, const std::string & comp_level)
+{
+  // Map CLI values to YAML values expected by rosbag2_storage_mcap
+  static const std::map<std::string, std::string> algo_map = {
+    {"none", "None"}, {"lz4", "Lz4"}, {"zstd", "Zstd"}};
+
+  fs::path config_path = fs::temp_directory_path() / "bag_converter_compression.yaml";
+  std::ofstream ofs(config_path);
+  ofs << "compression: " << algo_map.at(comp_algo) << "\n";
+  ofs << "compressionLevel: " << capitalize(comp_level) << "\n";
+  return config_path.string();
+}
+
 void print_usage()
 {
   std::cout
@@ -105,6 +128,9 @@ void print_usage()
     << "                            after point cloud messages in the bag.\n"
     << "  --merge                   Merge bag files from distributed log modules, then\n"
     << "                            convert. Accepts multiple input directories.\n"
+    << "  --comp-algo <none|lz4|zstd>  Output compression algorithm (default: zstd)\n"
+    << "  --comp-level <fastest|fast|default|slow|slowest>\n"
+    << "                            Output compression level (default: default)\n"
     << "  --delete                  Delete source bag files after successful processing.\n"
     << "                            In merge mode, deletes the original input bag files\n"
     << "                            after each group is successfully merged and converted.\n"
@@ -124,7 +150,8 @@ static bool option_takes_value(const std::string & arg)
 {
   return arg == "--min-range" || arg == "--max-range" || arg == "--point-type" ||
          arg == "--timescale-correction" || arg == "--timescale-correction-ref" ||
-         arg == "--base-frame" || arg == "--tf-mode";
+         arg == "--base-frame" || arg == "--tf-mode" || arg == "--comp-algo" ||
+         arg == "--comp-level";
 }
 
 std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & config)
@@ -241,6 +268,26 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       } else {
         std::cerr << "Error: Invalid value for --tf-mode '" << value
                   << "'. Must be 'static' or 'dynamic'.\n";
+        return 1;
+      }
+    } else if (arg == "--comp-algo" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "none" || value == "lz4" || value == "zstd") {
+        config.comp_algo = value;
+      } else {
+        std::cerr << "Error: Invalid value for --comp-algo '" << value
+                  << "'. Must be 'none', 'lz4', or 'zstd'.\n";
+        return 1;
+      }
+    } else if (arg == "--comp-level" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (
+        value == "fastest" || value == "fast" || value == "default" || value == "slow" ||
+        value == "slowest") {
+        config.comp_level = value;
+      } else {
+        std::cerr << "Error: Invalid value for --comp-level '" << value
+                  << "'. Must be 'fastest', 'fast', 'default', 'slow', or 'slowest'.\n";
         return 1;
       }
     } else if (arg == "--merge" || arg == "--delete") {
@@ -518,6 +565,8 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
   rosbag2_storage::StorageOptions storage_options_out;
   storage_options_out.uri = temp_dir.string();
   storage_options_out.storage_id = bag_metadata.storage_identifier;
+  storage_options_out.storage_config_uri =
+    create_compression_config(config.comp_algo, config.comp_level);
 
   rosbag2_cpp::Writer writer;
   try {
@@ -976,6 +1025,8 @@ static int64_t merge_and_convert_group(
   rosbag2_storage::StorageOptions storage_options_out;
   storage_options_out.uri = temp_dir.string();
   storage_options_out.storage_id = storage_identifier;
+  storage_options_out.storage_config_uri =
+    create_compression_config(config.comp_algo, config.comp_level);
 
   rosbag2_cpp::Writer writer;
   writer.open(storage_options_out);
@@ -1108,6 +1159,8 @@ int run_merge_and_convert(const BagConverterConfig & config)
   merge_config.input_dirs = config.input_dirs;
   merge_config.output_dir = config.dst_bag_path;
   merge_config.delete_sources = config.delete_sources;
+  merge_config.comp_algo = config.comp_algo;
+  merge_config.comp_level = config.comp_level;
 
   auto processor = [&config](
                      const std::vector<fs::path> & bag_files, const fs::path & output_path,

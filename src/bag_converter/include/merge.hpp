@@ -33,6 +33,8 @@ struct MergeConfig
   std::vector<std::string> input_dirs;
   std::string output_dir;
   bool delete_sources = false;
+  std::string comp_algo = "zstd";
+  std::string comp_level = "default";
 };
 
 /**

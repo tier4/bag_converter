@@ -107,6 +107,10 @@ struct BagConverterConfig
   std::string frame;
   BagConverterTfMode tf_mode = BagConverterTfMode::kStatic;
 
+  // Output compression
+  std::string comp_algo = "zstd";
+  std::string comp_level = "default";
+
   // Delete source files after successful conversion
   bool delete_sources = false;
 
@@ -141,6 +145,15 @@ std::string generate_output_topic(
  * @param conversion_stats Conversion statistics per topic
  */
 void print_summary(const std::map<std::string, BagConverterStats> & conversion_stats);
+
+/**
+ * @brief Create a temporary YAML config file for mcap compression settings
+ * @param comp_algo Compression algorithm: "none", "lz4", or "zstd"
+ * @param comp_level Compression level: "fastest", "fast", "default", "slow", or "slowest"
+ * @return Path to the temporary YAML file
+ */
+std::string create_compression_config(
+  const std::string & comp_algo, const std::string & comp_level);
 
 /**
  * @brief Print usage information

@@ -49,7 +49,7 @@ done
 # Helper: list of options that take a value argument
 option_takes_value() {
     case "$1" in
-    --min-range | --max-range | --point-type | --timescale-correction | --timescale-correction-ref | --base-frame | --tf-mode)
+    --min-range | --max-range | --point-type | --timescale-correction | --timescale-correction-ref | --base-frame | --tf-mode | --comp-algo | --comp-level)
         return 0
         ;;
     *)
