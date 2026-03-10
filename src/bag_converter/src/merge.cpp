@@ -155,7 +155,7 @@ std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> collect_top
  */
 static int64_t merge_group(
   const std::vector<fs::path> & bag_files, const fs::path & output_path,
-  const std::string & storage_identifier)
+  const std::string & storage_identifier, const MergeConfig & config)
 {
   // Collect topic union
   auto topic_union = collect_topic_union(bag_files);
@@ -182,6 +182,8 @@ static int64_t merge_group(
   rosbag2_storage::StorageOptions storage_options_out;
   storage_options_out.uri = temp_dir.string();
   storage_options_out.storage_id = storage_identifier;
+  storage_options_out.storage_config_uri =
+    create_compression_config(config.comp_algo, config.comp_level);
 
   rosbag2_cpp::Writer writer;
   writer.open(storage_options_out);
@@ -378,7 +380,7 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
     if (processor) {
       msg_count = processor(files, output_path, storage_identifier);
     } else {
-      msg_count = merge_group(files, output_path, storage_identifier);
+      msg_count = merge_group(files, output_path, storage_identifier, config);
     }
 
     if (msg_count < 0) {
