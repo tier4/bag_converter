@@ -111,6 +111,9 @@ struct BagConverterConfig
   std::string comp_algo = "zstd";
   std::string comp_level = "default";
 
+  // Passthrough mode (process all messages even without decodable topics)
+  bool passthrough = false;
+
   // Delete source files after successful conversion
   bool delete_sources = false;
 
