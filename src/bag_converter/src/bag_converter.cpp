@@ -128,6 +128,7 @@ void print_usage()
     << "                            after point cloud messages in the bag.\n"
     << "  --merge                   Merge bag files from distributed log modules, then\n"
     << "                            convert. Accepts multiple input directories.\n"
+    << "  --passthrough             Process all messages even without decodable topics\n"
     << "  --comp-algo <none|lz4|zstd>  Output compression algorithm (default: zstd)\n"
     << "  --comp-level <fastest|fast|default|slow|slowest>\n"
     << "                            Output compression level (default: default)\n"
@@ -290,6 +291,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
                   << "'. Must be 'fastest', 'fast', 'default', 'slow', or 'slowest'.\n";
         return 1;
       }
+    } else if (arg == "--passthrough") {
+      config.passthrough = true;
     } else if (arg == "--merge" || arg == "--delete") {
       // Already processed in pre-scan
     } else if (arg == "--help" || arg == "-h" || arg == "--version" || arg == "-v") {
@@ -541,11 +544,16 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     }
   }
 
-  if (!has_decodable_topics) {
+  if (!has_decodable_topics && !config.passthrough) {
     RCLCPP_WARN(
       g_logger, "Skipping conversion: no decodable topics found in %s",
       config.src_bag_path.c_str());
     return BagConverterResultStatus::kSkipped;
+  }
+
+  if (!has_decodable_topics && config.passthrough) {
+    RCLCPP_INFO(
+      g_logger, "Passthrough mode: no decodable topics, all messages will be passed through");
   }
 
   if (transformer && !has_tf_topic) {
