@@ -357,6 +357,14 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
     fs::path output_path = output_dir / output_filename;
 
     if (fs::exists(output_path)) {
+      if (!config.overwrite) {
+        RCLCPP_INFO(
+          g_logger,
+          "Output file already exists, skipping group '%s': %s (use --overwrite to replace)",
+          group_name.c_str(), output_path.string().c_str());
+        ++result.skipped_single_count;
+        continue;
+      }
       RCLCPP_INFO(g_logger, "Removing existing output file: %s", output_path.string().c_str());
       fs::remove(output_path);
     }

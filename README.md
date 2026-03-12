@@ -66,6 +66,7 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 | `--passthrough`                    | Process all messages even without decodable LiDAR packet topics (default: off)                                                                                       |
 | `--comp-algo <algo>`               | Output compression algorithm: `none`, `lz4`, or `zstd` (default: `zstd`). Applies to mcap output only.                                                               |
 | `--comp-level <level>`             | Output compression level: `fastest`, `fast`, `default`, `slow`, or `slowest` (default: `default`). Ignored when `--comp-algo none`.                                  |
+| `--overwrite`                      | Overwrite existing output files. By default, conversion is skipped if the output file already exists.                                                                |
 | `--merge`                          | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory. |
 | `--delete`                         | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.      |
 

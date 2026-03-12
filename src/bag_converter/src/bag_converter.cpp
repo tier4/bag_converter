@@ -195,6 +195,7 @@ void print_usage()
     << "                            correction before validation. Invalid stamps (before\n"
     << "                            year 2000) are left unchanged.\n"
     << "  --passthrough             Process all messages even without decodable topics\n"
+    << "  --overwrite               Overwrite existing output files (default: skip)\n"
     << "  --comp-algo <none|lz4|zstd>  Output compression algorithm (default: zstd)\n"
     << "  --comp-level <fastest|fast|default|slow|slowest>\n"
     << "                            Output compression level (default: default)\n"
@@ -361,6 +362,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       config.use_header_stamp_as_log_time = true;
     } else if (arg == "--passthrough") {
       config.passthrough = true;
+    } else if (arg == "--overwrite") {
+      config.overwrite = true;
     } else if (arg == "--merge" || arg == "--delete") {
       // Already processed in pre-scan
     } else if (arg == "--help" || arg == "-h" || arg == "--version" || arg == "-v") {
@@ -553,6 +556,14 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
   }
 
   const fs::path temp_dir = dst_path.string() + "_tmp";
+
+  // Skip if output already exists and --overwrite is not set
+  if (fs::exists(dst_path) && !config.overwrite) {
+    RCLCPP_INFO(
+      g_logger, "Output file already exists, skipping: %s (use --overwrite to replace)",
+      dst_path.c_str());
+    return BagConverterResultStatus::kSkipped;
+  }
 
   // Create parent directory if needed
   if (dst_path.has_parent_path() && !fs::exists(dst_path.parent_path())) {
@@ -1244,6 +1255,7 @@ int run_merge_and_convert(const BagConverterConfig & config)
   merge::MergeConfig merge_config;
   merge_config.input_dirs = config.input_dirs;
   merge_config.output_dir = config.dst_bag_path;
+  merge_config.overwrite = config.overwrite;
   merge_config.delete_sources = config.delete_sources;
   merge_config.comp_algo = config.comp_algo;
   merge_config.comp_level = config.comp_level;

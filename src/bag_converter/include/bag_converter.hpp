@@ -152,6 +152,9 @@ struct BagConverterConfig
   // Passthrough mode (process all messages even without decodable topics)
   bool passthrough = false;
 
+  // Overwrite existing output files (default: skip)
+  bool overwrite = false;
+
   // Delete source files after successful conversion
   bool delete_sources = false;
 
