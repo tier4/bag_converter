@@ -50,20 +50,24 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 
 ### Options
 
-| Option                           | Description                                                                                                                                                          |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--help`, `-h`                   | Show help message                                                                                                                                                    |
-| `--version`, `-v`                | Show version                                                                                                                                                         |
-| `--point-type <type>`            | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit`. For `en_xyzit` layout and extended fields, see [docs/en_xyzit.md](docs/en_xyzit.md).                    |
-| `--keep-original`                | Keep original packet topics in output bag                                                                                                                            |
-| `--base-frame <frame>`           | Transform PointCloud2 to the specified TF frame                                                                                                                      |
-| `--tf-mode <static\|dynamic>`    | TF mode: `static` (default) or `dynamic`                                                                                                                             |
-| `--use-header-stamp-as-log-time` | Override mcap log_time with `header.stamp` for messages with a known `std_msgs/msg/Header`. If the stamp is before year 2000, the original log_time is kept.         |
-| `--passthrough`                  | Process all messages even without decodable LiDAR packet topics                                                                                                      |
-| `--comp-algo <algo>`             | Output compression algorithm: `none`, `lz4`, or `zstd` (default: `zstd`). Applies to mcap output only.                                                               |
-| `--comp-level <level>`           | Output compression level: `fastest`, `fast`, `default`, `slow`, or `slowest` (default: `default`). Ignored when `--comp-algo none`.                                  |
-| `--merge`                        | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory. |
-| `--delete`                       | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.      |
+| Option                             | Description                                                                                                                                                          |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--help`, `-h`                     | Show help message                                                                                                                                                    |
+| `--version`, `-v`                  | Show version                                                                                                                                                         |
+| `--min-range <value>`              | Minimum range in meters (default: `0.1`)                                                                                                                             |
+| `--max-range <value>`              | Maximum range in meters (default: `250.0`)                                                                                                                           |
+| `--point-type <type>`              | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit`. For `en_xyzit` layout and extended fields, see [docs/en_xyzit.md](docs/en_xyzit.md).                    |
+| `--keep-original`                  | Keep original packet topics in output bag (default: off)                                                                                                             |
+| `--timescale-correction <on\|off>` | Enable/disable timescale correction (default: `on`)                                                                                                                  |
+| `--timescale-correction-ref <ref>` | Rosbag recording timescale: `utc` (default), `tai`, or `gps`                                                                                                         |
+| `--base-frame <frame>`             | Transform PointCloud2 to the specified TF frame (default: disabled)                                                                                                  |
+| `--tf-mode <static\|dynamic>`      | TF mode: `static` (default) or `dynamic`                                                                                                                             |
+| `--use-header-stamp-as-log-time`   | Override mcap log_time with `header.stamp` for messages with a known `std_msgs/msg/Header`. If the stamp is before year 2000, the original log_time is kept.         |
+| `--passthrough`                    | Process all messages even without decodable LiDAR packet topics (default: off)                                                                                       |
+| `--comp-algo <algo>`               | Output compression algorithm: `none`, `lz4`, or `zstd` (default: `zstd`). Applies to mcap output only.                                                               |
+| `--comp-level <level>`             | Output compression level: `fastest`, `fast`, `default`, `slow`, or `slowest` (default: `default`). Ignored when `--comp-algo none`.                                  |
+| `--merge`                          | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory. |
+| `--delete`                         | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.      |
 
 The `--base-frame` option transforms all output PointCloud2 messages to the specified coordinate frame using TF data (`tf2_msgs/msg/TFMessage`) from the input bag. The `--tf-mode` option controls how TF data is handled:
 
@@ -167,7 +171,7 @@ The output bag file contains `sensor_msgs::msg::PointCloud2` messages on topics 
 - `x` (float32): X coordinate in meters
 - `y` (float32): Y coordinate in meters
 - `z` (float32): Z coordinate in meters
-- `intensity` (float32): Intensity value
+- `intensity` (float32): Intensity value in [0.0, 255.0]
 - `t_us` (uint32): Relative timestamp in microseconds from the scan start time (xyzit, en_xyzit only). **Will be removed in v1.0.0**; use `timestamp` instead.
 - `timestamp` (uint32): Relative timestamp in nanoseconds from the scan start time (xyzit, en_xyzit only)
 
