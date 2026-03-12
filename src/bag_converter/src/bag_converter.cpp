@@ -14,6 +14,7 @@
 #include "tf_transformer.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -27,6 +28,66 @@ static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 
 namespace bag_converter
 {
+
+/**
+ * @brief Extract header.stamp from CDR-serialized data for known message types.
+ *
+ * For message types with std_msgs/msg/Header as the first field, the stamp
+ * (sec + nanosec) is at fixed CDR offsets 4-11 (after the 4-byte encapsulation header).
+ * Only applies to types listed in kTypesWithHeader.
+ *
+ * @param serialized_data The CDR-serialized message data
+ * @param topic_type The ROS 2 message type string
+ * @return Extracted timestamp, or std::nullopt if type is unsupported or data is too small
+ */
+static std::optional<rclcpp::Time> extract_header_stamp(
+  const rcutils_uint8_array_t & serialized_data, const std::string & topic_type)
+{
+  if (kTypesWithHeader.find(topic_type) == kTypesWithHeader.end()) {
+    return std::nullopt;
+  }
+
+  // CDR layout: [4-byte encapsulation][stamp.sec (int32)][stamp.nanosec (uint32)]...
+  constexpr size_t min_size = 4 + 4 + 4;
+  if (serialized_data.buffer_length < min_size) {
+    return std::nullopt;
+  }
+
+  int32_t sec;
+  uint32_t nanosec;
+  std::memcpy(&sec, serialized_data.buffer + 4, sizeof(sec));
+  std::memcpy(&nanosec, serialized_data.buffer + 8, sizeof(nanosec));
+  return rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
+}
+
+/**
+ * @brief Override log_time with header.stamp for a pass-through message.
+ *
+ * Extracts header.stamp, optionally applies timescale correction, then validates
+ * that the resulting timestamp is after year 2000. If invalid, keeps original log_time.
+ */
+static void override_log_time_from_header(
+  std::shared_ptr<rosbag2_storage::SerializedBagMessage> & bag_msg, const std::string & topic_type,
+  const BagConverterConfig & config)
+{
+  auto stamp = extract_header_stamp(*bag_msg->serialized_data, topic_type);
+  if (!stamp) {
+    return;
+  }
+
+  uint64_t stamp_ns = stamp->nanoseconds();
+  if (config.timescale_correction) {
+    stamp_ns = timescale::correct_timescale(
+      stamp_ns, static_cast<uint64_t>(bag_msg->time_stamp), config.timescale_correction_ref);
+  }
+
+  const int64_t stamp_sec = static_cast<int64_t>(stamp_ns) / 1'000'000'000;
+  if (stamp_sec < defaults::header_stamp_min_epoch_sec) {
+    return;  // invalid stamp, keep original log_time
+  }
+
+  bag_msg->time_stamp = static_cast<rcutils_time_point_value_t>(stamp_ns);
+}
 
 /// Extract frame_id from topic name by taking the parent path segment.
 /// e.g. "/sensing/lidar/front/nebula_packets" -> "lidar_front"
@@ -128,6 +189,11 @@ void print_usage()
     << "                            after point cloud messages in the bag.\n"
     << "  --merge                   Merge bag files from distributed log modules, then\n"
     << "                            convert. Accepts multiple input directories.\n"
+    << "  --use-header-stamp-as-log-time\n"
+    << "                            Override mcap log_time with header.stamp for messages\n"
+    << "                            with a known std_msgs/msg/Header. Applies timescale\n"
+    << "                            correction before validation. Invalid stamps (before\n"
+    << "                            year 2000) are left unchanged.\n"
     << "  --passthrough             Process all messages even without decodable topics\n"
     << "  --comp-algo <none|lz4|zstd>  Output compression algorithm (default: zstd)\n"
     << "  --comp-level <fastest|fast|default|slow|slowest>\n"
@@ -291,6 +357,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
                   << "'. Must be 'fastest', 'fast', 'default', 'slow', or 'slowest'.\n";
         return 1;
       }
+    } else if (arg == "--use-header-stamp-as-log-time") {
+      config.use_header_stamp_as_log_time = true;
     } else if (arg == "--passthrough") {
       config.passthrough = true;
     } else if (arg == "--merge" || arg == "--delete") {
@@ -456,9 +524,13 @@ ProcessMessageResult process_lidar_message(
 
   auto pc2_serialized = std::make_shared<rclcpp::SerializedMessage>();
   pc2_serializer.serialize_message(pcd_msg.get(), pc2_serialized.get());
+
+  // Use timescale-corrected header.stamp as log_time when enabled
+  const auto write_time =
+    config.use_header_stamp_as_log_time ? rclcpp::Time(pcd_msg->header.stamp) : log_time;
   writer.write(
     pc2_serialized, conversion_stats[topic_name].output_topic, "sensor_msgs/msg/PointCloud2",
-    log_time);
+    write_time);
   conversion_stats[topic_name].decoded_count++;
   return ProcessMessageResult::Decoded;
 }
@@ -678,6 +750,9 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     bool is_seyond = (topic_type == "seyond/msg/SeyondScan");
 
     if (!is_nebula && !is_seyond) {
+      if (config.use_header_stamp_as_log_time) {
+        override_log_time_from_header(bag_msg, topic_type, config);
+      }
       writer.write(bag_msg);
       if (message_count % defaults::progress_log_interval == 0) {
         RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
@@ -1125,6 +1200,9 @@ static int64_t merge_and_convert_group(
         return -1;
       }
     } else {
+      if (config.use_header_stamp_as_log_time) {
+        override_log_time_from_header(entry.message, topic_type, config);
+      }
       writer.write(entry.message);
     }
 
