@@ -1,8 +1,4 @@
 repositories:
-  dependencies/nebula_drs:
-    type: git
-    url: https://github.com/tier4/nebula_drs.git
-    version: v0.1.2
   dependencies/seyond_sdk:
     type: git
     url: https://github.com/Seyond-Inc/inno-lidar-sdk.git
