@@ -596,10 +596,6 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     return BagConverterResultStatus::kError;
   }
 
-  // RAII guard: frees page cache for tracked files on any exit path
-  memory_management::PageCacheGuard cache_guard;
-  cache_guard.track(config.src_bag_path);
-
   const auto bag_metadata = reader.get_metadata();
 
   // Create TF transformer if frame is specified
@@ -666,8 +662,6 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     RCLCPP_ERROR(g_logger, "Error opening output bag: %s", e.what());
     return BagConverterResultStatus::kError;
   }
-  cache_guard.track(dst_path.string());
-
   // Create output topics based on input metadata
   std::set<std::string> created_topics;
   for (const auto & topic_info : bag_metadata.topics_with_message_count) {
@@ -768,9 +762,6 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       if (message_count % defaults::progress_log_interval == 0) {
         RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
       }
-      if (message_count % defaults::page_cache_drop_interval == 0) {
-        cache_guard.drop();
-      }
       continue;
     }
 
@@ -788,9 +779,6 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
 
     if (message_count % defaults::progress_log_interval == 0) {
       RCLCPP_INFO(g_logger, "Processed %zu messages...", message_count);
-    }
-    if (message_count % defaults::page_cache_drop_interval == 0) {
-      cache_guard.drop();
     }
   }
 
@@ -1024,13 +1012,6 @@ static int64_t merge_and_convert_group(
   const std::vector<fs::path> & bag_files, const fs::path & output_path,
   const std::string & storage_identifier, const BagConverterConfig & config)
 {
-  // RAII guard: frees page cache for all tracked files on any exit path
-  memory_management::PageCacheGuard cache_guard;
-  for (const auto & bag_path : bag_files) {
-    cache_guard.track(bag_path.string());
-  }
-  cache_guard.track(output_path.string());
-
   // 1. Collect topic union
   auto topic_union = merge::collect_topic_union(bag_files);
   if (!topic_union.has_value()) {
@@ -1221,10 +1202,6 @@ static int64_t merge_and_convert_group(
     if (message_count % defaults::progress_log_interval == 0) {
       RCLCPP_INFO(g_logger, "  Processed %ld messages...", message_count);
     }
-    if (message_count % defaults::page_cache_drop_interval == 0) {
-      cache_guard.drop();
-    }
-
     // Read next message from the same reader
     auto & reader = readers[entry.reader_index];
     if (reader->has_next()) {

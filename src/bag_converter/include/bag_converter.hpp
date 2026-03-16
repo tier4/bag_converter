@@ -54,9 +54,6 @@ inline constexpr bool keep_original_topics = false;
 // Progress logging interval
 inline constexpr size_t progress_log_interval = 1000;
 
-// Page cache drop interval (in messages)
-inline constexpr size_t page_cache_drop_interval = 10000;
-
 // Minimum valid header.stamp epoch (2000-01-01T00:00:00Z = 946684800 seconds)
 inline constexpr int64_t header_stamp_min_epoch_sec = 946'684'800;
 

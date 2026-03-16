@@ -37,13 +37,4 @@ void fadvise_sequential_access(const std::string & path)
 #endif
 }
 
-void fadvise_drop_page_cache(const std::string & path)
-{
-#ifdef __linux__
-  fadvise(path, POSIX_FADV_DONTNEED);
-#else
-  (void)path;
-#endif
-}
-
 }  // namespace memory_management
