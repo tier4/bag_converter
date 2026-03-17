@@ -150,9 +150,6 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
     }
 
     const auto * pkt = reinterpret_cast<const InnoDataPacket *>(data_ptr->data());
-    if (pkt->type == INNO_ITEM_TYPE_MESSAGE || pkt->type == INNO_ITEM_TYPE_MESSAGE_LOG) {
-      continue;
-    }
 
     bag_converter::msg::SeyondPacket seyond_pkt;
     seyond_pkt.stamp = nebula_pkt.stamp;
@@ -171,7 +168,8 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
     RCLCPP_DEBUG(logger, "Skipped %zu status packets", skip_status);
   }
   if (skip_invalid > 0) {
-    RCLCPP_WARN(logger, "Skipped %zu invalid packets", skip_invalid);
+    RCLCPP_ERROR(
+      logger, "Skipped %zu invalid packets (not a data packet or status packet)", skip_invalid);
   }
 
   return scan;
