@@ -55,11 +55,6 @@ struct NebulaPCDDecoderConfig
 
   double min_range = defaults::min_range;
   double max_range = defaults::max_range;
-
-  // Unused fields kept for API compatibility with bag_converter.cpp
-  double scan_phase = 0.0;
-  double frequency_ms = 100.0;
-  bool use_sensor_time = true;
 };
 
 /**
