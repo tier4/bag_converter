@@ -150,7 +150,7 @@ def decode_pointcloud2(bag_path: str, point_step: int = 10000, delay: float | No
                             if len(field_data) > i:
                                 if field_name == 't_us' and base_time_us is not None:
                                     # Calculate absolute timestamp for t_us
-                                    abs_time_us = base_time_us + field_data[i]
+                                    abs_time_us = base_time_us + int(field_data[i])
                                     abs_time_sec = abs_time_us / 1_000_000.0
                                     stamp_str = f"stamp={abs_time_sec:.6f}"
                                     # Add t_us as a regular field

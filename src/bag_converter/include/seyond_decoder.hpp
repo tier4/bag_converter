@@ -41,7 +41,7 @@ inline constexpr double min_range = 0.3;
 inline constexpr double max_range = 200.0;
 inline constexpr size_t data_buffer_size_bytes = 2 * 1024 * 1024;  // 2MB buffer
 inline constexpr size_t initial_points_capacity =
-  100000;  // Initial capacity for point cloud reservation
+  200000;  // Initial capacity for point cloud reservation
 }  // namespace defaults
 
 // Configuration for the decoder
