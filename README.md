@@ -7,8 +7,6 @@
 - Nebula packet topics (`/nebula_packets`) and converts them to point cloud topics (`/nebula_points`)
 - Seyond scan topics (`/seyond_packets`) and converts them to point cloud topics (`/seyond_points`)
 
-Decoded LiDAR messages that produce no points or fewer than `1000` points are skipped. This filters status-only or otherwise non-decodable packet groups before they are written as `PointCloud2`.
-
 **Supported storage formats:** mcap, sqlite3
 
 ## Install
