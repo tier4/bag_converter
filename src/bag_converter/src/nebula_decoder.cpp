@@ -24,14 +24,9 @@ namespace bag_converter::decoder::nebula
 
 namespace
 {
-
-/// Size of a Robin W AngleHV table packet as prepended by nebula_drs: raw calibration blob
-/// (InnoDataPacket header + InnoAngleHVTable) without a valid header.
-constexpr size_t kRobinWAngleHVTablePacketSize = sizeof(InnoDataPacket) + sizeof(InnoAngleHVTable);
-
-/// If the first NebulaPacket is the raw calibration blob from nebula_drs (Robin W), it has
-/// this exact size but may have an uninitialized or invalid InnoDataPacket header. Fix the
-/// header so SeyondPCDDecoder and the SDK recognize it as INNO_ROBINW_ITEM_TYPE_ANGLEHV_TABLE.
+/// Fill in a valid InnoDataPacket header for a Robin W AngleHV table blob that was already
+/// identified by the caller so SeyondPCDDecoder and the SDK recognize it as
+/// INNO_ROBINW_ITEM_TYPE_ANGLEHV_TABLE.
 void fix_robinw_anglehv_table_header(std::vector<uint8_t> & buffer)
 {
   if (buffer.size() < sizeof(InnoDataPacket)) {
@@ -53,11 +48,6 @@ void fix_robinw_anglehv_table_header(std::vector<uint8_t> & buffer)
 bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
   const nebula_msgs::msg::NebulaPackets & input, const std::string & frame_id)
 {
-  // SeyondScan (from Tier4 seyond_ros_driver) contains only data packets (POINTS, HVTABLE); it does
-  // not contain status packets or invalid packets. NebulaPackets are raw UDP datagrams and may
-  // include status or malformed packets. We detect and skip them below so the output matches
-  // SeyondScan semantics.
-
   bag_converter::msg::SeyondScan scan;
   scan.header = input.header;
   scan.header.frame_id = frame_id;
@@ -81,7 +71,7 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
     // the header is not already a valid data packet (magic != kInnoMagicNumberDataPacket), so we
     // never overwrite a proper HVTABLE or mis-detect a same-size POINTS packet.
     if (
-      i == 0 && orig.size() == kRobinWAngleHVTablePacketSize &&
+      i == 0 && orig.size() == sizeof(InnoDataPacket) + sizeof(InnoAngleHVTable) &&
       orig.size() >= sizeof(InnoDataPacket)) {
       const auto * pkt = reinterpret_cast<const InnoDataPacket *>(orig.data());
       if (
