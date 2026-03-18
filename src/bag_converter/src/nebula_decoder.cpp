@@ -62,9 +62,6 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
 
   const auto logger = rclcpp::get_logger("bag_converter.decoder.nebula");
 
-  size_t skip_status = 0;
-  size_t skip_invalid = 0;
-
   for (size_t i = 0; i < input.packets.size(); ++i) {
     const auto & nebula_pkt = input.packets[i];
     const auto & orig = nebula_pkt.data;
@@ -116,16 +113,13 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
     }
 
     if (data_ptr->size() < sizeof(InnoCommonVersion)) {
-      ++skip_invalid;
       continue;
     }
     const auto magic = reinterpret_cast<const InnoCommonVersion *>(data_ptr->data())->magic_number;
     if (magic == kInnoMagicNumberStatusPacket) {
-      ++skip_status;
       continue;
     }
     if (magic != kInnoMagicNumberDataPacket) {
-      ++skip_invalid;
       continue;
     }
 
@@ -163,15 +157,6 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
     }
     scan.packets.push_back(std::move(seyond_pkt));
   }
-
-  if (skip_status > 0) {
-    RCLCPP_DEBUG(logger, "Skipped %zu status packets", skip_status);
-  }
-  if (skip_invalid > 0) {
-    RCLCPP_ERROR(
-      logger, "Skipped %zu invalid packets (not a data packet or status packet)", skip_invalid);
-  }
-
   return scan;
 }
 
