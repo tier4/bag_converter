@@ -37,18 +37,14 @@ namespace bag_converter::decoder::seyond
 // Default configuration constants
 namespace defaults
 {
-inline constexpr double min_range = 0.3;
-inline constexpr double max_range = 200.0;
 inline constexpr size_t data_buffer_size_bytes = 2 * 1024 * 1024;  // 2MB buffer
 inline constexpr size_t initial_points_capacity =
   200000;  // Initial capacity for point cloud reservation
 }  // namespace defaults
 
 // Configuration for the decoder
-struct SeyondPCDDecoderConfig
+struct SeyondPCDDecoderConfig : public BasePCDDecoderConfig
 {
-  double min_range = defaults::min_range;
-  double max_range = defaults::max_range;
 };
 
 /**
@@ -89,50 +85,6 @@ public:
   sensor_msgs::msg::PointCloud2::SharedPtr decode_typed(
     const bag_converter::msg::SeyondScan & input) override;
 
-  /**
-   * @brief Get configuration
-   * @return Current decoder configuration
-   */
-  SeyondPCDDecoderConfig get_config() const;
-
-  /**
-   * @brief Set configuration
-   * @param config New decoder configuration
-   */
-  void set_config(const SeyondPCDDecoderConfig & config);
-
-  /**
-   * @brief Set angle HV table
-   * @param table HV table data
-   */
-  void set_angle_hv_table(const std::vector<char> & table);
-
-  /**
-   * @brief Clear angle HV table
-   */
-  void clear_angle_hv_table();
-
-  /**
-   * @brief Check if angle HV table is initialized
-   * @return True if HV table is initialized
-   */
-  bool has_angle_hv_table() const { return anglehv_table_init_; }
-
-private:
-  void process_packet(
-    const bag_converter::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud);
-
-  void convert_and_parse(const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud);
-
-  void data_packet_parse(const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud);
-
-  template <typename PointType>
-  void point_xyz_data_parse(
-    bool is_use_refl, uint32_t point_num, PointType point_ptr,
-    pcl::PointCloud<OutputPointT> & cloud);
-
-  void coordinate_transfer(OutputPointT * point, float x, float y, float z);
-
 private:
   SeyondPCDDecoderConfig config_;
   bool anglehv_table_init_;
@@ -158,8 +110,23 @@ private:
   // Reusable point cloud buffer (avoids per-scan heap allocation)
   pcl::PointCloud<OutputPointT> cloud_;
 
-  static constexpr double us_in_second_c = 1000000.0;
-  static constexpr double ten_us_in_second_c = 100000.0;
+  void set_angle_hv_table(const std::vector<char> & table);
+  void clear_angle_hv_table();
+  bool has_angle_hv_table() const { return anglehv_table_init_; }
+
+  void process_packet(
+    const bag_converter::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud);
+
+  void convert_and_parse(const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud);
+
+  void data_packet_parse(const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud);
+
+  template <typename PointType>
+  void point_xyz_data_parse(
+    bool is_use_refl, uint32_t point_num, PointType point_ptr,
+    pcl::PointCloud<OutputPointT> & cloud);
+
+  void coordinate_transfer(OutputPointT * point, float x, float y, float z);
 };
 
 }  // namespace bag_converter::decoder::seyond

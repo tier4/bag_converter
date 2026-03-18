@@ -151,12 +151,13 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
 // NebulaPCDDecoder implementation
 template <typename OutputPointT>
 NebulaPCDDecoder<OutputPointT>::NebulaPCDDecoder(const NebulaPCDDecoderConfig & config)
-: config_(config)
+: config_(config), seyond_decoder_([&config]() {
+    seyond::SeyondPCDDecoderConfig seyond_config;
+    seyond_config.min_range = config.min_range;
+    seyond_config.max_range = config.max_range;
+    return seyond::SeyondPCDDecoder<OutputPointT>(seyond_config);
+  }())
 {
-  seyond::SeyondPCDDecoderConfig seyond_config;
-  seyond_config.min_range = config.min_range;
-  seyond_config.max_range = config.max_range;
-  seyond_decoder_.set_config(seyond_config);
 }
 
 template <typename OutputPointT>
@@ -168,23 +169,6 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
 {
   bag_converter::msg::SeyondScan scan = nebula_packets_to_seyond_scan(input, config_.frame_id);
   return seyond_decoder_.decode_typed(scan);
-}
-
-template <typename OutputPointT>
-NebulaPCDDecoderConfig NebulaPCDDecoder<OutputPointT>::get_config() const
-{
-  return config_;
-}
-
-template <typename OutputPointT>
-void NebulaPCDDecoder<OutputPointT>::set_config(const NebulaPCDDecoderConfig & config)
-{
-  config_ = config;
-
-  seyond::SeyondPCDDecoderConfig seyond_config;
-  seyond_config.min_range = config.min_range;
-  seyond_config.max_range = config.max_range;
-  seyond_decoder_.set_config(seyond_config);
 }
 
 // Explicit template instantiations

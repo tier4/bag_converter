@@ -257,18 +257,6 @@ void SeyondPCDDecoder<OutputPointT>::coordinate_transfer(
 }
 
 template <typename OutputPointT>
-SeyondPCDDecoderConfig SeyondPCDDecoder<OutputPointT>::get_config() const
-{
-  return config_;
-}
-
-template <typename OutputPointT>
-void SeyondPCDDecoder<OutputPointT>::set_config(const SeyondPCDDecoderConfig & config)
-{
-  config_ = config;
-}
-
-template <typename OutputPointT>
 void SeyondPCDDecoder<OutputPointT>::set_angle_hv_table(const std::vector<char> & table)
 {
   anglehv_table_ = table;
