@@ -13,8 +13,11 @@
 
 ```shell
 # clone repository
-git clone https://github.com/tier4/bag_converter.git
+git clone --recurse-submodules https://github.com/tier4/bag_converter.git
 cd bag_converter
+
+# if already cloned without --recurse-submodules
+git submodule update --init
 
 # build
 cd docker
@@ -33,7 +36,8 @@ To use a specific version, checkout the corresponding tag and rebuild:
 git tag
 
 # checkout a specific version and rebuild
-git checkout v0.4.0
+git checkout v0.6.5
+git submodule update --init
 cd docker
 ./build.sh
 ```
