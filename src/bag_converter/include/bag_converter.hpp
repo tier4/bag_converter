@@ -44,8 +44,6 @@ namespace bag_converter
 
 namespace defaults
 {
-inline constexpr size_t min_points_per_scan = 1000;
-
 // Common configuration defaults
 inline constexpr double min_range = 0.1;
 inline constexpr double max_range = 250.0;

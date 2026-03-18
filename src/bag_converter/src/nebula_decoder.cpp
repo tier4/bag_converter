@@ -17,6 +17,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <algorithm>
+
 namespace bag_converter::decoder::nebula
 {
 
@@ -175,11 +177,6 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
   const nebula_msgs::msg::NebulaPackets & input)
 {
   bag_converter::msg::SeyondScan scan = nebula_packets_to_seyond_scan(input, config_.frame_id);
-
-  if (scan.packets.empty()) {
-    return nullptr;
-  }
-
   return seyond_decoder_.decode_typed(scan);
 }
 

@@ -80,18 +80,12 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
     }
   }
 
-  // Check if point cloud is empty
   if (cloud_.points.empty()) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("bag_converter.decoder.seyond"),
-      "Decoded point cloud is empty (no points found in scan)");
+    return nullptr;
   }
 
-  // Create PointCloud2 message
   auto pc2_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
   pcl::toROSMsg(cloud_, *pc2_msg);
-
-  // Set header timestamp from input message
   pc2_msg->header.stamp = input.header.stamp;
   pc2_msg->header.frame_id = cloud_.header.frame_id;
 
