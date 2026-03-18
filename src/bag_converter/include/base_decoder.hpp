@@ -11,17 +11,22 @@
 
 #include "point_types.hpp"
 
+#include <rclcpp/rclcpp.hpp>
 #include <rclcpp/serialization.hpp>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
-
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
 
 #include <memory>
 
 namespace bag_converter::decoder
 {
+
+namespace defaults
+{
+
+inline constexpr size_t min_points_per_scan = 1000;
+
+}  // namespace defaults
 
 /**
  * @brief Abstract base class for PCD decoders using type erasure pattern
@@ -49,7 +54,8 @@ public:
    * Derived classes deserialize the message internally and convert to PointCloud2.
    *
    * @param serialized_msg The serialized ROS message to decode
-   * @return Shared pointer to PointCloud2 message, or nullptr if decoding fails
+   * @return Shared pointer to PointCloud2 message, or nullptr if decoding fails, the point cloud
+   * is empty, or the point cloud contains too few points
    */
   virtual sensor_msgs::msg::PointCloud2::SharedPtr decode(
     const rclcpp::SerializedMessage & serialized_msg) = 0;
@@ -82,17 +88,33 @@ public:
   /**
    * @brief Decode serialized message to PointCloud2 (implements PCDDecoderBase)
    *
-   * Deserializes the message and delegates to the typed decode method.
+   * Deserializes the message and delegates to the typed decode method. Returns nullptr if the
+   * decoded PointCloud2 is empty or contains too few points.
    *
    * @param serialized_msg The serialized ROS message to decode
-   * @return Shared pointer to PointCloud2 message, or nullptr if decoding fails
+   * @return Shared pointer to PointCloud2 message, or nullptr if decoding fails, the point cloud
+   * is empty, or the point cloud contains too few points
    */
   sensor_msgs::msg::PointCloud2::SharedPtr decode(
     const rclcpp::SerializedMessage & serialized_msg) override
   {
     InputScanT input_msg;
     serializer_.deserialize_message(&serialized_msg, &input_msg);
-    return decode_typed(input_msg);
+    auto decoded_msg = decode_typed(input_msg);
+    if (!decoded_msg) {
+      return nullptr;
+    }
+
+    if (decoded_msg->width == 0 || decoded_msg->data.empty()) {
+      return nullptr;
+    }
+
+    const size_t num_points = decoded_msg->width * decoded_msg->height;
+    if (num_points < defaults::min_points_per_scan) {
+      return nullptr;
+    }
+
+    return decoded_msg;
   }
 
   /**
@@ -102,10 +124,12 @@ public:
    * Converts the input scan message of type InputScanT to a PointCloud2 message.
    *
    * @param input The input scan message to decode
-   * @return Shared pointer to PointCloud2 message, or nullptr if decoding fails
+   * @return Shared pointer to PointCloud2 message, or nullptr if decoding fails or contains no
+   * points
    */
   virtual sensor_msgs::msg::PointCloud2::SharedPtr decode_typed(const InputScanT & input) = 0;
 
+protected:
 private:
   rclcpp::Serialization<InputScanT> serializer_;
 };

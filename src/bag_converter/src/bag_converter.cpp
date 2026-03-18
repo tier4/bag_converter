@@ -496,13 +496,6 @@ ProcessMessageResult process_lidar_message(
   auto pcd_msg = dec->decode(serialized_msg);
 
   if (!pcd_msg) {
-    return ProcessMessageResult::Decoded;  // nothing to write, no stats change
-  }
-
-  const size_t num_points = pcd_msg->width * pcd_msg->height;
-  if (num_points < defaults::min_points_per_scan) {
-    RCLCPP_INFO(g_logger, "Status packets detected (skipped decoding this message)");
-    conversion_stats[topic_name].skipped_count++;
     return ProcessMessageResult::Skipped;
   }
 
