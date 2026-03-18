@@ -34,8 +34,6 @@ namespace bag_converter::decoder::nebula
 namespace defaults
 {
 inline constexpr const char * frame_id = "seyond";
-inline constexpr double min_range = 0.3;
-inline constexpr double max_range = 200.0;
 }  // namespace defaults
 
 /**
@@ -48,13 +46,10 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
   const nebula_msgs::msg::NebulaPackets & input, const std::string & frame_id);
 
 // Configuration for the decoder
-struct NebulaPCDDecoderConfig
+struct NebulaPCDDecoderConfig : public BasePCDDecoderConfig
 {
   // frame_id for output PointCloud2 (NebulaPackets.header.frame_id is always empty)
   std::string frame_id = defaults::frame_id;
-
-  double min_range = defaults::min_range;
-  double max_range = defaults::max_range;
 };
 
 /**
@@ -80,9 +75,6 @@ public:
 
   sensor_msgs::msg::PointCloud2::SharedPtr decode_typed(
     const nebula_msgs::msg::NebulaPackets & input) override;
-
-  [[nodiscard]] NebulaPCDDecoderConfig get_config() const;
-  void set_config(const NebulaPCDDecoderConfig & config);
 
 private:
   NebulaPCDDecoderConfig config_;

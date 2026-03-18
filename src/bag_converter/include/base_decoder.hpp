@@ -24,9 +24,17 @@ namespace bag_converter::decoder
 namespace defaults
 {
 
+inline constexpr double min_range = 0.3;
+inline constexpr double max_range = 200.0;
 inline constexpr size_t min_points_per_scan = 1000;
 
 }  // namespace defaults
+
+struct BasePCDDecoderConfig
+{
+  double min_range = defaults::min_range;
+  double max_range = defaults::max_range;
+};
 
 /**
  * @brief Abstract base class for PCD decoders using type erasure pattern
