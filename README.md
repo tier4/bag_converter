@@ -11,20 +11,28 @@
 
 ## Install
 
+For v0.7.0 and later (git submodules):
+
 ```shell
-# clone repository
 git clone --recurse-submodules https://github.com/tier4/bag_converter.git
 cd bag_converter
 
 # if already cloned without --recurse-submodules
 git submodule update --init
 
-# build
 cd docker
 ./build.sh
+```
 
-# clean build
-./build.sh --no-cache
+For v0.6.x and earlier (vcs import):
+
+```shell
+git clone https://github.com/tier4/bag_converter.git
+cd bag_converter
+vcs import src < repos.yaml
+
+cd docker
+./build.sh
 ```
 
 ### Switching Versions
