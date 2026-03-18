@@ -135,10 +135,6 @@ void SeyondPCDDecoder<OutputPointT>::convert_and_parse(
   } else if (CHECK_XYZ_POINTCLOUD_DATA(pkt->type)) {
     // Directly parse xyz point cloud data
     data_packet_parse(pkt, cloud);
-  } else {
-    RCLCPP_INFO(
-      rclcpp::get_logger("bag_converter.decoder.seyond"),
-      "Skipping packet (type %d): not a point cloud packet", pkt->type);
   }
 }
 
