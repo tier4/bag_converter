@@ -29,15 +29,22 @@ cd docker
 
 ### Switching Versions
 
-To use a specific version, checkout the corresponding tag and rebuild:
+To use a specific version, checkout the corresponding tag and rebuild.
+
+For v0.7.0 and later (git submodules):
 
 ```shell
-# list available versions
-git tag
-
-# checkout a specific version and rebuild
-git checkout v0.6.5
+git checkout v0.7.0
 git submodule update --init
+cd docker
+./build.sh
+```
+
+For v0.6.x and earlier (vcs import):
+
+```shell
+git checkout v0.6.5
+vcs import src < repos.yaml
 cd docker
 ./build.sh
 ```
