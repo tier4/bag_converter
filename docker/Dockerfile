@@ -36,9 +36,8 @@ RUN apt-get update && \
 # Set the working directory
 WORKDIR /opt/drs
 
-# Copy repos.yaml and import dependencies using vcs
-COPY repos.yaml /opt/drs/
-RUN mkdir src/ && vcs import src < repos.yaml
+# Copy dependencies (git submodules)
+COPY src/dependencies/ /opt/drs/src/dependencies/
 
 # Copy only package.xml first for dependency resolution (cached unless package.xml changes)
 COPY src/bag_converter/package.xml /opt/drs/src/bag_converter/package.xml

@@ -13,11 +13,6 @@ build/
 install/
 log/
 
-# Dependencies
-/src/dependencies/nebula_drs/
-/src/dependencies/seyond_sdk/
-/src/dependencies/oxts_ros2_driver/
-
 # Private docs
 .docs/
 
