@@ -116,9 +116,6 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
       continue;
     }
     const auto magic = reinterpret_cast<const InnoCommonVersion *>(data_ptr->data())->magic_number;
-    if (magic == kInnoMagicNumberStatusPacket) {
-      continue;
-    }
     if (magic != kInnoMagicNumberDataPacket) {
       continue;
     }
@@ -142,7 +139,6 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
     if (data_ptr->size() < sizeof(InnoDataPacket)) {
       continue;
     }
-
     const auto * pkt = reinterpret_cast<const InnoDataPacket *>(data_ptr->data());
 
     bag_converter::msg::SeyondPacket seyond_pkt;
