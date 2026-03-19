@@ -18,7 +18,7 @@ git clone --recurse-submodules https://github.com/tier4/bag_converter.git
 cd bag_converter
 
 # if already cloned without --recurse-submodules
-git submodule update --init
+git submodule update --init --recursive
 
 cd docker
 ./build.sh
@@ -43,7 +43,7 @@ For v0.7.0 and later (git submodules):
 
 ```shell
 git checkout v0.7.0
-git submodule update --init
+git submodule update --init --recursive
 cd docker
 ./build.sh
 ```
@@ -69,25 +69,25 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 
 ### Options
 
-| Option                             | Description                                                                                                                                                          |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--help`, `-h`                     | Show help message                                                                                                                                                    |
-| `--version`, `-v`                  | Show version                                                                                                                                                         |
-| `--min-range <value>`              | Minimum range in meters (default: `0.1`)                                                                                                                             |
-| `--max-range <value>`              | Maximum range in meters (default: `250.0`)                                                                                                                           |
-| `--point-type <type>`              | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit`. For `en_xyzit` layout and extended fields, see [docs/en_xyzit.md](docs/en_xyzit.md).                    |
-| `--keep-original`                  | Keep original packet topics in output bag (default: off)                                                                                                             |
-| `--timescale-correction <on\|off>` | Enable/disable timescale correction (default: `on`)                                                                                                                  |
-| `--timescale-correction-ref <ref>` | Rosbag recording timescale: `utc` (default), `tai`, or `gps`                                                                                                         |
-| `--base-frame <frame>`             | Transform PointCloud2 to the specified TF frame (default: disabled)                                                                                                  |
-| `--tf-mode <static\|dynamic>`      | TF mode: `static` (default) or `dynamic`                                                                                                                             |
-| `--use-header-stamp-as-log-time`   | Override mcap log_time with `header.stamp` for messages with a known `std_msgs/msg/Header`. If the stamp is before year 2000, the original log_time is kept.         |
-| `--passthrough`                    | Process all messages even without decodable LiDAR packet topics (default: off)                                                                                       |
-| `--comp-algo <algo>`               | Output compression algorithm: `none`, `lz4`, or `zstd` (default: `zstd`). Applies to mcap output only.                                                               |
-| `--comp-level <level>`             | Output compression level: `fastest`, `fast`, `default`, `slow`, or `slowest` (default: `default`). Ignored when `--comp-algo none`.                                  |
-| `--overwrite`                      | Overwrite existing output files. By default, conversion is skipped if the output file already exists.                                                                |
-| `--merge`                          | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory. |
-| `--delete`                         | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.      |
+| Option                             | Description                                                                                                                                                                                                                            |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--help`, `-h`                     | Show help message                                                                                                                                                                                                                      |
+| `--version`, `-v`                  | Show version                                                                                                                                                                                                                           |
+| `--min-range <value>`              | Minimum range in meters (default: `0.1`)                                                                                                                                                                                               |
+| `--max-range <value>`              | Maximum range in meters (default: `250.0`)                                                                                                                                                                                             |
+| `--point-type <type>`              | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit`. For `en_xyzit` layout and extended fields, see [docs/en_xyzit.md](docs/en_xyzit.md).                                                                                      |
+| `--keep-original`                  | Keep original packet topics in output bag (default: off)                                                                                                                                                                               |
+| `--timescale-correction <on\|off>` | Enable/disable timescale correction (default: `on`)                                                                                                                                                                                    |
+| `--timescale-correction-ref <ref>` | Rosbag recording timescale: `utc` (default), `tai`, or `gps`                                                                                                                                                                           |
+| `--base-frame <frame>`             | Transform PointCloud2 to the specified TF frame (default: disabled)                                                                                                                                                                    |
+| `--tf-mode <static\|dynamic>`      | TF mode: `static` (default) or `dynamic`                                                                                                                                                                                               |
+| `--use-header-stamp-as-log-time`   | Override mcap log_time with `header.stamp` for messages that have a `std_msgs/msg/Header` (e.g. NebulaPackets, SeyondScan, PointCloud2, CameraInfo, Imu). If the stamp is before 2000-01-01 or invalid, the original log_time is kept. |
+| `--passthrough`                    | Process all messages even without decodable LiDAR packet topics (default: off)                                                                                                                                                         |
+| `--comp-algo <algo>`               | Output compression algorithm: `none`, `lz4`, or `zstd` (default: `zstd`). Applies to mcap output only.                                                                                                                                 |
+| `--comp-level <level>`             | Output compression level: `fastest`, `fast`, `default`, `slow`, or `slowest` (default: `default`). Ignored when `--comp-algo none`.                                                                                                    |
+| `--overwrite`                      | Overwrite existing output files. By default, conversion is skipped if the output file already exists.                                                                                                                                  |
+| `--merge`                          | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory.                                                                   |
+| `--delete`                         | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.                                                                        |
 
 The `--base-frame` option transforms all output PointCloud2 messages to the specified coordinate frame using TF data (`tf2_msgs/msg/TFMessage`) from the input bag. The `--tf-mode` option controls how TF data is handled:
 
@@ -178,7 +178,7 @@ The input bag file contains `nebula_msgs::msg::NebulaPackets` messages on topics
 
 #### SeyondScan
 
-The input bag file contains `seyond::msg::SeyondScan` messages on topics ending with `/seyond_packets`. This format is used when recording with the **official Seyond SDK**. The messages contain scan data from Seyond LiDAR sensors.
+The input bag file contains `seyond::msg::SeyondScan` messages on topics ending with `/seyond_packets`. This format is used when recording with [seyond_ros_driver](https://github.com/tier4/seyond_ros_driver) (or a compatible Seyond driver). The messages contain scan data from Seyond LiDAR sensors.
 
 ### Output: PointCloud2
 

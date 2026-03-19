@@ -16,12 +16,12 @@
 #include "seyond_decoder.hpp"
 #include "timescale.hpp"
 
-#include <bag_converter/msg/seyond_scan.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/serialization.hpp>
 #include <rosbag2_cpp/reader.hpp>
 #include <rosbag2_cpp/writer.hpp>
 #include <rosbag2_storage/storage_options.hpp>
+#include <seyond/msg/seyond_scan.hpp>
 
 #include <nebula_msgs/msg/nebula_packets.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -58,12 +58,16 @@ inline constexpr int64_t header_stamp_min_epoch_sec = 946'684'800;
 }  // namespace defaults
 
 /**
- * @brief Set of ROS 2 message types known to have std_msgs/msg/Header as the first field.
+ * @brief Set of ROS 2 message types that have std_msgs/msg/Header (used for log_time override).
  *
- * For these types, header.stamp is located at a fixed CDR offset (bytes 4-11),
- * enabling reliable extraction without full deserialization.
+ * For these types, header.stamp is extracted by deserializing the message and
+ * reading the header field, so log_time can be overridden from header.stamp when
+ * --use-header-stamp-as-log-time is enabled.
  */
 inline const std::set<std::string> kTypesWithHeader = {
+  // LiDAR packet types (for log_time override when keeping original topics)
+  "nebula_msgs/msg/NebulaPackets",
+  "seyond/msg/SeyondScan",
   // sensor_msgs
   "sensor_msgs/msg/CameraInfo",
   "sensor_msgs/msg/CompressedImage",

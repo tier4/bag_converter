@@ -16,7 +16,6 @@ elseif(CMAKE_CXX_STANDARD LESS 17)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 find_package(rosbag2_storage REQUIRED)
@@ -33,16 +32,14 @@ find_package(builtin_interfaces REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(can_msgs REQUIRED)
+find_package(oxts_msgs REQUIRED)
+find_package(seyond REQUIRED)
 
-# Generate Seyond messages
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/SeyondPacket.msg"
-  "msg/SeyondScan.msg"
-  DEPENDENCIES builtin_interfaces std_msgs
-)
-
-# Seyond SDK paths
-set(SEYOND_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/seyond_sdk)
+# Seyond SDK path: use the one bundled in seyond_ros_driver (nested submodule)
+set(SEYOND_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/seyond_ros_driver/src/seyond_lidar_ros/src/seyond_sdk)
 set(SEYOND_SDK_LIB_PATH ${SEYOND_SDK_PATH}/lib/libinnolidarsdkclient.a)
 
 # Build Seyond SDK if needed
@@ -56,10 +53,6 @@ if(NOT EXISTS ${SEYOND_SDK_LIB_PATH})
     message(FATAL_ERROR "Failed to build Seyond SDK")
   endif()
 endif()
-
-
-# Get message typesupport target
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} rosidl_typesupport_cpp)
 
 # Build unified bag_converter executable
 add_executable(bag_converter_bin
@@ -106,10 +99,12 @@ ament_target_dependencies(bag_converter_bin
   tf2
   tf2_msgs
   tf2_sensor_msgs
+  geometry_msgs
+  nav_msgs
+  can_msgs
+  oxts_msgs
+  seyond
 )
-
-# Link with message generation
-target_link_libraries(bag_converter_bin "${cpp_typesupport_target}")
 
 install(TARGETS bag_converter_bin
   DESTINATION lib/${PROJECT_NAME}

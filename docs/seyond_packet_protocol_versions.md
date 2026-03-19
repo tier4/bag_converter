@@ -2,6 +2,8 @@
 
 This document describes the Seyond LiDAR packet protocol versions (v1 and v2), the structural differences between them, and how the SDK performs automatic conversion.
 
+**Path note:** In this repository the Seyond SDK is provided by the `seyond_ros_driver` submodule at `src/dependencies/seyond_ros_driver/src/seyond_lidar_ros/src/seyond_sdk`. Paths below are relative to that SDK root (e.g. `src/sdk_client/...`).
+
 ## Background
 
 Seyond LiDAR sensors (e.g. Falcon K) transmit raw UDP data using the **v1** protocol format. The Seyond client SDK automatically converts these packets to the **v2** format before delivering them to the application. This means:
@@ -17,7 +19,7 @@ The only difference is a **16-byte reserved field** (`extend_reserved[4]`) inser
 
 ### InnoDataPacketV1 (54 bytes header)
 
-Defined in `seyond_sdk/src/sdk_client/inno_lidar_packet_v1_adapt.h`.
+Defined in `src/sdk_client/inno_lidar_packet_v1_adapt.h`.
 
 | Offset | Size | Field                                                     |
 | ------ | ---- | --------------------------------------------------------- |
@@ -30,7 +32,7 @@ Defined in `seyond_sdk/src/sdk_client/inno_lidar_packet_v1_adapt.h`.
 
 ### InnoDataPacket v2 (70 bytes header)
 
-Defined in `seyond_sdk/src/sdk_common/inno_lidar_packet.h`.
+Defined in `src/sdk_common/inno_lidar_packet.h`.
 
 | Offset | Size    | Field                                                     |
 | ------ | ------- | --------------------------------------------------------- |
@@ -50,7 +52,7 @@ The source code comments confirm this:
 
 ## SDK Automatic v1 → v2 Conversion
 
-The conversion is performed by `InnoPacketV1Adapt::check_data_packet_v1_and_convert_packet()` in `seyond_sdk/src/sdk_client/inno_lidar_packet_v1_adapt.h`.
+The conversion is performed by `InnoPacketV1Adapt::check_data_packet_v1_and_convert_packet()` in `src/sdk_client/inno_lidar_packet_v1_adapt.h`.
 
 ### Steps
 
@@ -71,7 +73,7 @@ The conversion is performed by `InnoPacketV1Adapt::check_data_packet_v1_and_conv
 
 ## Protocol Version Constants
 
-Defined in `seyond_sdk/src/sdk_common/inno_lidar_packet.h`:
+Defined in `src/sdk_common/inno_lidar_packet.h`:
 
 | Constant                      | Value    | Description                        |
 | ----------------------------- | -------- | ---------------------------------- |
@@ -79,7 +81,7 @@ Defined in `seyond_sdk/src/sdk_common/inno_lidar_packet.h`:
 | `kInnoMajorVersionDataPacket` | `4`      | Current SDK protocol major version |
 | `kInnoMinorVersionDataPacket` | `0`      | Current SDK protocol minor version |
 
-Defined in `seyond_sdk/src/sdk_client/inno_lidar_packet_v1_adapt.h`:
+Defined in `src/sdk_client/inno_lidar_packet_v1_adapt.h`:
 
 | Constant               | Value | Description                           |
 | ---------------------- | ----- | ------------------------------------- |
@@ -89,14 +91,14 @@ Defined in `seyond_sdk/src/sdk_client/inno_lidar_packet_v1_adapt.h`:
 
 ## Connection-Time Version Negotiation
 
-During TCP/HTTP connection setup (`seyond_sdk/src/utils/net_manager.cpp`), the SDK sends its protocol version to the LiDAR via HTTP headers:
+During TCP/HTTP connection setup (`src/utils/net_manager.cpp`), the SDK sends its protocol version to the LiDAR via HTTP headers:
 
 ```text
 X-INNO-MAJOR-VERSION: 4
 X-INNO-MINOR-VERSION: 0
 ```
 
-The LiDAR responds with its own version. The SDK verifies compatibility in `InnoUtils::verify_lidar_version()` (`seyond_sdk/src/utils/utils.cpp`):
+The LiDAR responds with its own version. The SDK verifies compatibility in `InnoUtils::verify_lidar_version()` (`src/utils/utils.cpp`):
 
 - If the LiDAR's major version exceeds the SDK's → error (SDK upgrade required)
 - If the LiDAR's minor version exceeds the SDK's → warning
