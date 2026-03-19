@@ -174,6 +174,6 @@ So Tier4 packet stamps are per-packet; original (in the adapter) uses a single t
 
 ## 8. Conclusion for bag_converter
 
-- **SeyondScan source**: bag_converter assumes SeyondScan is produced by **Tier4’s seyond_ros_driver**. The message format (header + packets with type and stamp) and frame-boundary publishing with explicit HVTABLE packets match Tier4, not the original.
+- **SeyondScan source**: bag_converter uses the `seyond::msg::SeyondScan` / `seyond::msg::SeyondPacket` types from [seyond_ros_driver](https://github.com/tier4/seyond_ros_driver) and expects input bags to be recorded with that driver. The message format (header + packets with type and stamp) and frame-boundary publishing with explicit HVTABLE packets match Tier4, not the original.
 - **Status packets**: Neither Tier4 nor the original driver adds status packets to SeyondScan; both rely on the SDK’s separate data vs status callbacks. So the “no status in SeyondScan” assumption holds for both.
 - **Compatibility**: Rosbags recorded with the **original** Seyond-Inc driver use a different SeyondScan/SeyondPacket schema and are not directly compatible with bag_converter; conversion would require adapting to the Tier4 message layout (header, type, stamp, data-only packets, HVTABLE as a separate packet).

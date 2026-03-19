@@ -8,9 +8,7 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
-  <depend>rosidl_default_runtime</depend>
   <depend>rclcpp</depend>
   <depend>rosbag2_cpp</depend>
   <depend>rosbag2_storage</depend>
@@ -25,10 +23,11 @@
   <depend>tf2</depend>
   <depend>tf2_msgs</depend>
   <depend>tf2_sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>can_msgs</depend>
   <depend>oxts_msgs</depend>
-
-  <member_of_group>rosidl_interface_packages</member_of_group>
+  <depend>seyond</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

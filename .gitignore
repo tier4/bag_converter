@@ -26,3 +26,7 @@ log/
 *.db3
 *.sqlite3
 metadata.yaml
+
+# Removed submodule: Seyond SDK is now provided by seyond_ros_driver (nested submodule).
+# Ignore leftover directory if it remains after "git rm" so it does not appear as untracked.
+src/dependencies/seyond_sdk/

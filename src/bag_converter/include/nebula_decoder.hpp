@@ -14,7 +14,7 @@
 #include "point_types.hpp"
 #include "seyond_decoder.hpp"
 
-#include <bag_converter/msg/seyond_scan.hpp>
+#include <seyond/msg/seyond_scan.hpp>
 
 #include <nebula_msgs/msg/nebula_packets.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -42,7 +42,7 @@ inline constexpr const char * frame_id = "seyond";
  * @param frame_id Frame ID for the output scan header
  * @return SeyondScan with HVTABLE and POINTS packets only, or empty packets if none
  */
-bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
+::seyond::msg::SeyondScan nebula_packets_to_seyond_scan(
   const nebula_msgs::msg::NebulaPackets & input, const std::string & frame_id);
 
 // Configuration for the decoder

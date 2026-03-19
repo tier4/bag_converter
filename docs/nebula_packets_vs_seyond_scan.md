@@ -2,7 +2,7 @@
 
 This document compares how **NebulaPackets** (from `nebula_drs`) and **SeyondScan** (from `seyond_ros_driver`) wrap raw Seyond LiDAR data into ROS messages. Understanding these differences is essential for building a unified decoder in `bag_converter`.
 
-**SeyondScan assumption**: `bag_converter` assumes that `SeyondScan` messages are produced by [Tier4's seyond_ros_driver](https://github.com/tier4/seyond_ros_driver) (fork of [Seyond-Inc/seyond_ros_driver](https://github.com/Seyond-Inc/seyond_ros_driver)). The behavior and message format described for SeyondScan in this document refer to that driver.
+**SeyondScan assumption**: `bag_converter` uses the `seyond::msg::SeyondScan` and `seyond::msg::SeyondPacket` types from [seyond_ros_driver](https://github.com/tier4/seyond_ros_driver) and expects input bags to be recorded with that driver. The behavior and message format described for SeyondScan in this document refer to that driver.
 
 ## 1. Message Definitions
 
@@ -20,7 +20,7 @@ uint8[] data
 
 - **No explicit packet type field** -- the type must be inferred from the raw binary data.
 
-### SeyondScan (Tier4 seyond_ros_driver)
+### SeyondScan ([seyond_ros_driver](https://github.com/tier4/seyond_ros_driver))
 
 ```text
 # SeyondScan.msg
@@ -220,9 +220,9 @@ else
 - Intensity mode: scales [0, 1600] to [0, 255].
 - For non-compact (XYZ/EnXYZ) packets: raw `refl` / `intensity` / `reflectance` fields are used directly with no scaling.
 
-### SeyondScan (Tier4 seyond_ros_driver)
+### SeyondScan ([seyond_ros_driver](https://github.com/tier4/seyond_ros_driver))
 
-The Tier4 seyond_ros_driver in packet mode does not decode points -- it stores raw packets. The decoding logic in frame mode (or subscriber callback) uses the same SDK functions (`inno_lidar_convert_to_xyz_pointcloud2`, etc.) as `bag_converter/seyond_decoder.cpp`.
+[seyond_ros_driver](https://github.com/tier4/seyond_ros_driver) in packet mode does not decode points -- it stores raw packets. The decoding logic in frame mode (or subscriber callback) uses the same SDK functions (`inno_lidar_convert_to_xyz_pointcloud2`, etc.) as `bag_converter/seyond_decoder.cpp`.
 
 ### bag_converter's seyond_decoder.cpp
 

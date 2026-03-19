@@ -13,7 +13,13 @@
 
 #include "sdk_client/inno_lidar_packet_v1_adapt.h"
 #include "sdk_common/inno_lidar_packet.h"
-#include "sdk_common/inno_lidar_packet_utils.h"
+
+// Nested seyond_sdk in seyond_ros_driver may not define this macro; define locally for
+// compatibility
+#ifndef CHECK_ANGLEHV_TABLE_DATA
+#define CHECK_ANGLEHV_TABLE_DATA(X) \
+  ((X) == INNO_ROBINW_ITEM_TYPE_ANGLEHV_TABLE || (X) == INNO_ROBINE_LITE_TYPE_ANGLEHV_TABLE)
+#endif
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -45,10 +51,10 @@ void fix_robinw_anglehv_table_header(std::vector<uint8_t> & buffer)
 
 }  // anonymous namespace
 
-bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
+::seyond::msg::SeyondScan nebula_packets_to_seyond_scan(
   const nebula_msgs::msg::NebulaPackets & input, const std::string & frame_id)
 {
-  bag_converter::msg::SeyondScan scan;
+  ::seyond::msg::SeyondScan scan;
   scan.header = input.header;
   scan.header.frame_id = frame_id;
 
@@ -78,9 +84,9 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
         pkt->common.version.magic_number == kInnoMagicNumberDataPacket &&
         CHECK_ANGLEHV_TABLE_DATA(pkt->type)) {
         // Already a valid HVTABLE packet (e.g. from sensor or replayed SeyondScan), emit as-is.
-        bag_converter::msg::SeyondPacket seyond_pkt;
+        ::seyond::msg::SeyondPacket seyond_pkt;
         seyond_pkt.stamp = nebula_pkt.stamp;
-        seyond_pkt.type = bag_converter::msg::SeyondPacket::PACKET_TYPE_HVTABLE;
+        seyond_pkt.type = ::seyond::msg::SeyondPacket::PACKET_TYPE_HVTABLE;
         seyond_pkt.data = orig;
         scan.packets.push_back(std::move(seyond_pkt));
         continue;
@@ -93,9 +99,9 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
           logger,
           "First packet recognized as Robin W AngleHV table (raw calibration blob), fixed header "
           "and emitted as HVTABLE");
-        bag_converter::msg::SeyondPacket seyond_pkt;
+        ::seyond::msg::SeyondPacket seyond_pkt;
         seyond_pkt.stamp = nebula_pkt.stamp;
-        seyond_pkt.type = bag_converter::msg::SeyondPacket::PACKET_TYPE_HVTABLE;
+        seyond_pkt.type = ::seyond::msg::SeyondPacket::PACKET_TYPE_HVTABLE;
         seyond_pkt.data = std::move(buffer);
         scan.packets.push_back(std::move(seyond_pkt));
         continue;
@@ -133,11 +139,11 @@ bag_converter::msg::SeyondScan nebula_packets_to_seyond_scan(
     }
     const auto * pkt = reinterpret_cast<const InnoDataPacket *>(data_ptr->data());
 
-    bag_converter::msg::SeyondPacket seyond_pkt;
+    ::seyond::msg::SeyondPacket seyond_pkt;
     seyond_pkt.stamp = nebula_pkt.stamp;
     seyond_pkt.type = CHECK_ANGLEHV_TABLE_DATA(pkt->type)
-                        ? bag_converter::msg::SeyondPacket::PACKET_TYPE_HVTABLE
-                        : bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS;
+                        ? ::seyond::msg::SeyondPacket::PACKET_TYPE_HVTABLE
+                        : ::seyond::msg::SeyondPacket::PACKET_TYPE_POINTS;
     if (data_ptr == &buffer) {
       seyond_pkt.data = std::move(buffer);
     } else {
@@ -167,7 +173,7 @@ template <typename OutputPointT>
 sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_typed(
   const nebula_msgs::msg::NebulaPackets & input)
 {
-  bag_converter::msg::SeyondScan scan = nebula_packets_to_seyond_scan(input, config_.frame_id);
+  ::seyond::msg::SeyondScan scan = nebula_packets_to_seyond_scan(input, config_.frame_id);
   return seyond_decoder_.decode_typed(scan);
 }
 

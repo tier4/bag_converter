@@ -12,8 +12,8 @@
 #include "base_decoder.hpp"
 #include "point_types.hpp"
 
-#include <bag_converter/msg/seyond_packet.hpp>
-#include <bag_converter/msg/seyond_scan.hpp>
+#include <seyond/msg/seyond_packet.hpp>
+#include <seyond/msg/seyond_scan.hpp>
 
 // Forward declarations for SDK types
 struct InnoDataPacket;
@@ -57,7 +57,7 @@ struct SeyondPCDDecoderConfig : public BasePCDDecoderConfig
  * bag_converter::point::PointXYZIT)
  */
 template <typename OutputPointT = bag_converter::point::PointXYZIT>
-class SeyondPCDDecoder : public PCDDecoder<bag_converter::msg::SeyondScan, OutputPointT>
+class SeyondPCDDecoder : public PCDDecoder<::seyond::msg::SeyondScan, OutputPointT>
 {
 public:
   /**
@@ -83,7 +83,7 @@ public:
    * @return Shared pointer to PointCloud2 message, or nullptr if decoding fails
    */
   sensor_msgs::msg::PointCloud2::SharedPtr decode_typed(
-    const bag_converter::msg::SeyondScan & input) override;
+    const ::seyond::msg::SeyondScan & input) override;
 
 private:
   SeyondPCDDecoderConfig config_;
@@ -115,7 +115,7 @@ private:
   bool has_angle_hv_table() const { return anglehv_table_init_; }
 
   void process_packet(
-    const bag_converter::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud);
+    const ::seyond::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud);
 
   void convert_and_parse(const InnoDataPacket * pkt, pcl::PointCloud<OutputPointT> & cloud);
 

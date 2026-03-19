@@ -1,9 +1,10 @@
 [submodule "src/dependencies/nebula_drs"]
 	path = src/dependencies/nebula_drs
 	url = https://github.com/tier4/nebula_drs.git
-[submodule "src/dependencies/seyond_sdk"]
-	path = src/dependencies/seyond_sdk
-	url = https://github.com/Seyond-Inc/inno-lidar-sdk.git
 [submodule "src/dependencies/oxts_ros2_driver"]
 	path = src/dependencies/oxts_ros2_driver
 	url = https://github.com/tier4/oxts_ros2_driver.git
+[submodule "src/dependencies/seyond_ros_driver"]
+	path = src/dependencies/seyond_ros_driver
+	url = https://github.com/tier4/seyond_ros_driver.git
+	branch = tier4/develop

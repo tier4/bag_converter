@@ -35,7 +35,7 @@ SeyondPCDDecoder<OutputPointT>::~SeyondPCDDecoder() = default;
 
 template <typename OutputPointT>
 sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_typed(
-  const bag_converter::msg::SeyondScan & input)
+  const ::seyond::msg::SeyondScan & input)
 {
   // Reuse member point cloud buffer: clear points but keep allocated memory
   cloud_.points.clear();
@@ -49,7 +49,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
   if (!anglehv_table_init_) {
     // Look for HV table packet in the scan
     for (const auto & packet : input.packets) {
-      if (packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_HVTABLE) {
+      if (packet.type == ::seyond::msg::SeyondPacket::PACKET_TYPE_HVTABLE) {
         anglehv_table_.resize(packet.data.size());
         std::memcpy(anglehv_table_.data(), packet.data.data(), packet.data.size());
         anglehv_table_init_ = true;
@@ -64,8 +64,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
   // Find the first POINTS packet to get the scan start time
   scan_start_us_ = 0.0;
   for (const auto & packet : input.packets) {
-    if (
-      packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS && !packet.data.empty()) {
+    if (packet.type == ::seyond::msg::SeyondPacket::PACKET_TYPE_POINTS && !packet.data.empty()) {
       const auto * pkt = reinterpret_cast<const InnoDataPacket *>(packet.data.data());
       scan_start_us_ = pkt->common.ts_start_us;
       break;
@@ -74,8 +73,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
 
   // Process each packet in the scan
   for (const auto & packet : input.packets) {
-    if (
-      packet.type == bag_converter::msg::SeyondPacket::PACKET_TYPE_POINTS && !packet.data.empty()) {
+    if (packet.type == ::seyond::msg::SeyondPacket::PACKET_TYPE_POINTS && !packet.data.empty()) {
       process_packet(packet, cloud_);
     }
   }
@@ -94,7 +92,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr SeyondPCDDecoder<OutputPointT>::decode_
 
 template <typename OutputPointT>
 void SeyondPCDDecoder<OutputPointT>::process_packet(
-  const bag_converter::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud)
+  const ::seyond::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud)
 {
   if (packet.data.empty()) {
     return;

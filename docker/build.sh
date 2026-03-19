@@ -25,6 +25,9 @@ EOF
 # Change to parent directory
 cd "$(dirname "$0")/.."
 
+# Ensure submodules (including seyond_ros_driver and its nested seyond_sdk) are initialized
+git submodule update --init --recursive
+
 # Default values
 NO_CACHE_FLAG=""
 PARALLEL_JOBS=4
