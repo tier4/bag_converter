@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>bag_converter</name>
-  <version>0.1.0</version>
+  <version>0.7.0</version>
   <description>PointCloud2 decoder for Seyond LiDAR data in rosbag2 format</description>
   <maintainer email="mineto.tsukada@tier4.jp">Mineto Tsukada</maintainer>
   <license>Apache-2.0</license>
