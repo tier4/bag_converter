@@ -6,8 +6,8 @@
  *  Page cache management utilities for large sequential file I/O
  */
 
-#ifndef BAG_CONVERTER__MEMORY_MANAGEMENT_HPP
-#define BAG_CONVERTER__MEMORY_MANAGEMENT_HPP
+#ifndef BAG_CONVERTER_MEMORY_MANAGEMENT_HPP
+#define BAG_CONVERTER_MEMORY_MANAGEMENT_HPP
 
 #include <string>
 
@@ -27,4 +27,4 @@ void fadvise_sequential_access(const std::string & path);
 
 }  // namespace memory_management
 
-#endif  // BAG_CONVERTER__MEMORY_MANAGEMENT_HPP
+#endif  // BAG_CONVERTER_MEMORY_MANAGEMENT_HPP

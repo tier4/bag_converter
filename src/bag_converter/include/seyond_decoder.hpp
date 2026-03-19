@@ -6,8 +6,8 @@
  *  SeyondPCDDecoder class definition for bag_converter package
  */
 
-#ifndef BAG_CONVERTER__SEYOND_DECODER_HPP
-#define BAG_CONVERTER__SEYOND_DECODER_HPP
+#ifndef BAG_CONVERTER_SEYOND_DECODER_HPP
+#define BAG_CONVERTER_SEYOND_DECODER_HPP
 
 #include "base_decoder.hpp"
 #include "point_types.hpp"
@@ -37,7 +37,8 @@ namespace bag_converter::decoder::seyond
 // Default configuration constants
 namespace defaults
 {
-inline constexpr size_t data_buffer_size_bytes = 2 * 1024 * 1024;  // 2MB buffer
+inline constexpr size_t data_buffer_size_bytes =
+  static_cast<size_t>(2) * 1024 * 1024;  // 2MB buffer
 inline constexpr size_t initial_points_capacity =
   200000;  // Initial capacity for point cloud reservation
 }  // namespace defaults
@@ -112,7 +113,7 @@ private:
 
   void set_angle_hv_table(const std::vector<char> & table);
   void clear_angle_hv_table();
-  bool has_angle_hv_table() const { return anglehv_table_init_; }
+  [[nodiscard]] bool has_angle_hv_table() const { return anglehv_table_init_; }
 
   void process_packet(
     const ::seyond::msg::SeyondPacket & packet, pcl::PointCloud<OutputPointT> & cloud);
@@ -131,4 +132,4 @@ private:
 
 }  // namespace bag_converter::decoder::seyond
 
-#endif  // BAG_CONVERTER__SEYOND_DECODER_HPP
+#endif  // BAG_CONVERTER_SEYOND_DECODER_HPP

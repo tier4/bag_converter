@@ -6,8 +6,8 @@
  *  Timescale correction utilities for converting between UTC, TAI, and GPS time
  */
 
-#ifndef BAG_CONVERTER__TIMESCALE_HPP
-#define BAG_CONVERTER__TIMESCALE_HPP
+#ifndef BAG_CONVERTER_TIMESCALE_HPP
+#define BAG_CONVERTER_TIMESCALE_HPP
 
 #include <cstdint>
 #include <stdexcept>
@@ -43,4 +43,4 @@ std::uint64_t correct_timescale(
 
 }  // namespace bag_converter::timescale
 
-#endif  // BAG_CONVERTER__TIMESCALE_HPP
+#endif  // BAG_CONVERTER_TIMESCALE_HPP

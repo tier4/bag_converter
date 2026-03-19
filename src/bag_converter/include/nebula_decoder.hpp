@@ -7,8 +7,8 @@
  *  NebulaPackets to SeyondScan internally and delegates point decoding.
  */
 
-#ifndef BAG_CONVERTER__NEBULA_DECODER_HPP
-#define BAG_CONVERTER__NEBULA_DECODER_HPP
+#ifndef BAG_CONVERTER_NEBULA_DECODER_HPP
+#define BAG_CONVERTER_NEBULA_DECODER_HPP
 
 #include "base_decoder.hpp"
 #include "point_types.hpp"
@@ -85,4 +85,4 @@ private:
 
 }  // namespace bag_converter::decoder::nebula
 
-#endif  // BAG_CONVERTER__NEBULA_DECODER_HPP
+#endif  // BAG_CONVERTER_NEBULA_DECODER_HPP

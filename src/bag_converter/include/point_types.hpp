@@ -6,8 +6,8 @@
  *  Point type definitions for bag converter
  */
 
-#ifndef BAG_CONVERTER__POINT_TYPES_HPP
-#define BAG_CONVERTER__POINT_TYPES_HPP
+#ifndef BAG_CONVERTER_POINT_TYPES_HPP
+#define BAG_CONVERTER_POINT_TYPES_HPP
 
 #include <pcl/point_types.h>
 
@@ -72,13 +72,13 @@ struct EIGEN_ALIGN16 PointXYZIT
 /// value is valid; when clear, the value is 0 and must be ignored.
 namespace en_xyzit_flags
 {
-constexpr uint16_t HAS_REFL_TYPE = 1u << 0;
-constexpr uint16_t HAS_ELONGATION = 1u << 1;
-constexpr uint16_t HAS_LIDAR_STATUS = 1u << 2;
-constexpr uint16_t HAS_LIDAR_MODE = 1u << 3;
-constexpr uint16_t HAS_PKT_VERSION_MAJOR = 1u << 4;
-constexpr uint16_t HAS_PKT_VERSION_MINOR = 1u << 5;
-constexpr uint16_t HAS_LIDAR_TYPE = 1u << 6;
+constexpr uint16_t has_refl_type = 1U << 0;
+constexpr uint16_t has_elongation = 1U << 1;
+constexpr uint16_t has_lidar_status = 1U << 2;
+constexpr uint16_t has_lidar_mode = 1U << 3;
+constexpr uint16_t has_pkt_version_major = 1U << 4;
+constexpr uint16_t has_pkt_version_minor = 1U << 5;
+constexpr uint16_t has_lidar_type = 1U << 6;
 }  // namespace en_xyzit_flags
 
 /**
@@ -148,4 +148,4 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
     uint8_t, lidar_mode, lidar_mode)(uint8_t, pkt_version_major, pkt_version_major)(
     uint8_t, pkt_version_minor, pkt_version_minor)(uint8_t, lidar_type, lidar_type))
 
-#endif  // BAG_CONVERTER__POINT_TYPES_HPP
+#endif  // BAG_CONVERTER_POINT_TYPES_HPP

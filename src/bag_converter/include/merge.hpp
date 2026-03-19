@@ -6,8 +6,8 @@
  *  Merge: merge multiple rosbag2 files from distributed log modules
  */
 
-#ifndef BAG_CONVERTER__MERGE_HPP
-#define BAG_CONVERTER__MERGE_HPP
+#ifndef BAG_CONVERTER_MERGE_HPP
+#define BAG_CONVERTER_MERGE_HPP
 
 #include <rosbag2_storage/serialized_bag_message.hpp>
 #include <rosbag2_storage/topic_metadata.hpp>
@@ -20,9 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace bag_converter
-{
-namespace merge
+namespace bag_converter::merge
 {
 
 /**
@@ -83,9 +81,8 @@ std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> collect_top
  * @param processor Optional custom group processor. If nullptr, uses default k-way merge.
  * @return 0 on success, non-zero on failure
  */
-int run_merge(const MergeConfig & config, MergeGroupProcessor processor = nullptr);
+int run_merge(const MergeConfig & config, const MergeGroupProcessor & processor = nullptr);
 
-}  // namespace merge
-}  // namespace bag_converter
+}  // namespace bag_converter::merge
 
-#endif  // BAG_CONVERTER__MERGE_HPP
+#endif  // BAG_CONVERTER_MERGE_HPP

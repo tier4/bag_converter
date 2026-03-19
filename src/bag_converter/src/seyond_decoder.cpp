@@ -25,7 +25,15 @@ namespace bag_converter::decoder::seyond
 // SeyondPCDDecoder implementation
 template <typename OutputPointT>
 SeyondPCDDecoder<OutputPointT>::SeyondPCDDecoder(const SeyondPCDDecoderConfig & config)
-: config_(config), anglehv_table_init_(false), scan_start_us_(0.0), pkt_offset_us_(0.0)
+: config_(config),
+  anglehv_table_init_(false),
+  scan_start_us_(0.0),
+  pkt_offset_us_(0.0),
+  pkt_lidar_mode_(0),
+  pkt_lidar_status_(0),
+  pkt_lidar_type_(0),
+  pkt_version_major_(0),
+  pkt_version_minor_(0)
 {
   data_buffer_.resize(defaults::data_buffer_size_bytes);
 }
@@ -176,7 +184,7 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       continue;
     }
 
-    OutputPointT point;
+    OutputPointT point{};
 
     // Set intensity based on point type and configuration
     if constexpr (std::is_same<PointType, const InnoEnXyzPoint *>::value) {
@@ -216,18 +224,18 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       if constexpr (std::is_same<PointType, const InnoXyzPoint *>::value) {
         point.refl_type = static_cast<uint8_t>(point_ptr->type);
         point.elongation = static_cast<uint8_t>(point_ptr->elongation);
-        point.flags |= fl::HAS_REFL_TYPE | fl::HAS_ELONGATION;
+        point.flags |= fl::has_refl_type | fl::has_elongation;
       }
       point.lidar_status = static_cast<uint8_t>(pkt_lidar_status_);
       point.lidar_mode = static_cast<uint8_t>(pkt_lidar_mode_);
-      point.flags |= fl::HAS_LIDAR_STATUS | fl::HAS_LIDAR_MODE;
+      point.flags |= fl::has_lidar_status | fl::has_lidar_mode;
 
       point.pkt_version_major = pkt_version_major_;
       point.pkt_version_minor = pkt_version_minor_;
-      point.flags |= fl::HAS_PKT_VERSION_MAJOR | fl::HAS_PKT_VERSION_MINOR;
+      point.flags |= fl::has_pkt_version_major | fl::has_pkt_version_minor;
 
       point.lidar_type = pkt_lidar_type_;
-      point.flags |= fl::HAS_LIDAR_TYPE;
+      point.flags |= fl::has_lidar_type;
     }
 
     // Apply coordinate transformation (Autoware coordinate system)

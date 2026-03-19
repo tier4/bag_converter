@@ -30,9 +30,7 @@ namespace fs = std::filesystem;
 
 static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter_merge");
 
-namespace bag_converter
-{
-namespace merge
+namespace bag_converter::merge
 {
 
 /**
@@ -137,9 +135,8 @@ std::optional<std::map<std::string, rosbag2_storage::TopicMetadata>> collect_top
           g_logger, "Duplicate topic '%s' found across bags. Skipping group.",
           topic_meta.name.c_str());
         return std::nullopt;
-      } else {
-        topic_union[topic_meta.name] = topic_meta;
       }
+      topic_union[topic_meta.name] = topic_meta;
     }
   }
 
@@ -271,7 +268,7 @@ static void print_merge_summary(const MergeResult & result)
   RCLCPP_INFO(g_logger, "===================================");
 }
 
-int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
+int run_merge(const MergeConfig & config, const MergeGroupProcessor & processor)
 {
   fs::path output_dir(config.output_dir);
 
@@ -384,7 +381,7 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
       storage_identifier = reader.get_metadata().storage_identifier;
     }
 
-    int64_t msg_count;
+    int64_t msg_count = 0;
     if (processor) {
       msg_count = processor(files, output_path, storage_identifier);
     } else {
@@ -423,5 +420,4 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
   return result.failed_count > 0 ? 1 : 0;
 }
 
-}  // namespace merge
-}  // namespace bag_converter
+}  // namespace bag_converter::merge

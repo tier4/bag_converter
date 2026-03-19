@@ -6,8 +6,8 @@
  *  TF2 coordinate transformation for PointCloud2 messages
  */
 
-#ifndef BAG_CONVERTER__TF_TRANSFORMER_HPP
-#define BAG_CONVERTER__TF_TRANSFORMER_HPP
+#ifndef BAG_CONVERTER_TF_TRANSFORMER_HPP
+#define BAG_CONVERTER_TF_TRANSFORMER_HPP
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/serialization.hpp>
@@ -50,4 +50,4 @@ private:
 
 }  // namespace bag_converter::tf_transformer
 
-#endif  // BAG_CONVERTER__TF_TRANSFORMER_HPP
+#endif  // BAG_CONVERTER_TF_TRANSFORMER_HPP

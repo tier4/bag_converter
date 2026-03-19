@@ -6,8 +6,8 @@
  *  PCD decoder base class and template for converting various message types to point clouds
  */
 
-#ifndef BAG_CONVERTER__BASE_DECODER_HPP
-#define BAG_CONVERTER__BASE_DECODER_HPP
+#ifndef BAG_CONVERTER_BASE_DECODER_HPP
+#define BAG_CONVERTER_BASE_DECODER_HPP
 
 #include "point_types.hpp"
 
@@ -144,4 +144,4 @@ private:
 
 }  // namespace bag_converter::decoder
 
-#endif  // BAG_CONVERTER__BASE_DECODER_HPP
+#endif  // BAG_CONVERTER_BASE_DECODER_HPP

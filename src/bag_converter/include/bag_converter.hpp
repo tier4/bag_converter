@@ -7,8 +7,8 @@
  *  Automatically detects and converts both NebulaPackets and SeyondScan messages
  */
 
-#ifndef BAG_CONVERTER__BAG_CONVERTER_HPP
-#define BAG_CONVERTER__BAG_CONVERTER_HPP
+#ifndef BAG_CONVERTER_BAG_CONVERTER_HPP
+#define BAG_CONVERTER_BAG_CONVERTER_HPP
 
 #include "memory_management.hpp"
 #include "nebula_decoder.hpp"
@@ -64,7 +64,7 @@ inline constexpr int64_t header_stamp_min_epoch_sec = 946'684'800;
  * reading the header field, so log_time can be overridden from header.stamp when
  * --use-header-stamp-as-log-time is enabled.
  */
-inline const std::set<std::string> kTypesWithHeader = {
+inline const std::set<std::string> g_types_with_header = {
   // LiDAR packet types (for log_time override when keeping original topics)
   "nebula_msgs/msg/NebulaPackets",
   "seyond/msg/SeyondScan",
@@ -268,4 +268,4 @@ int run_merge_and_convert(const BagConverterConfig & config);
 
 }  // namespace bag_converter
 
-#endif  // BAG_CONVERTER__BAG_CONVERTER_HPP
+#endif  // BAG_CONVERTER_BAG_CONVERTER_HPP

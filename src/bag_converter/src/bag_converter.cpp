@@ -60,7 +60,7 @@ namespace bag_converter
 static std::optional<rclcpp::Time> extract_header_stamp(
   const rcutils_uint8_array_t & serialized_data, const std::string & topic_type)
 {
-  if (kTypesWithHeader.find(topic_type) == kTypesWithHeader.end()) {
+  if (g_types_with_header.find(topic_type) == g_types_with_header.end()) {
     return std::nullopt;
   }
   try {
@@ -642,8 +642,10 @@ ProcessMessageResult process_lidar_message(
     const std::uint64_t sensor_time_ns_corrected = timescale::correct_timescale(
       sensor_time_ns, log_time.nanoseconds(), config.timescale_correction_ref);
     if (sensor_time_ns_corrected != sensor_time_ns) {
-      pcd_msg->header.stamp.sec = sensor_time_ns_corrected / 1000000000;
-      pcd_msg->header.stamp.nanosec = sensor_time_ns_corrected % 1000000000;
+      pcd_msg->header.stamp.sec = static_cast<builtin_interfaces::msg::Time::_sec_type>(
+        sensor_time_ns_corrected / 1000000000);
+      pcd_msg->header.stamp.nanosec = static_cast<builtin_interfaces::msg::Time::_nanosec_type>(
+        sensor_time_ns_corrected % 1000000000);
     }
   }
 
@@ -1404,7 +1406,7 @@ int main(int argc, char ** argv)
 
   rclcpp::init(argc, argv);
 
-  int result;
+  int result = 0;
   if (config.merge) {
     result = bag_converter::run_merge_and_convert(config);
   } else if (config.batch_mode) {

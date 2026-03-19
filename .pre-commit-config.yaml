@@ -1,6 +1,7 @@
 ci:
   autofix_commit_msg: "style(pre-commit): autofix"
   autoupdate_commit_msg: "ci(pre-commit): autoupdate"
+  skip: [clang-tidy]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -62,5 +63,15 @@ repos:
         types_or: [c++, c, cuda]
         exclude: >-
           ^(build/|install/|log/|.*\.(mcap|db3|pcd|bag|bin|so|a|o|dylib|dll|exe)|.*/json\.hpp$)
+
+  - repo: local
+    hooks:
+      - id: clang-tidy
+        name: clang-tidy
+        entry: run-clang-tidy -p build -j 32 -fix -quiet
+        language: system
+        types_or: [c++, c, cuda]
+        exclude: >-
+          ^(build/|install/|log/|src/dependencies/|.*\.(mcap|db3|pcd|bag|bin|so|a|o|dylib|dll|exe)|.*/json\.hpp$)
 
 exclude: .svg

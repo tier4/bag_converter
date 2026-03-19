@@ -1,0 +1,239 @@
+# All disabled checks have to come with an explanatory comment that states why they were disabled!
+#
+# bugprone-easily-swappable-parameters:
+#  Not always easily fixable, modern IDEs with parameter chips/hints help avoid this problem
+#
+# modernize-use-trailing-return-type:
+#  Purely stylistic, makes function signature longer
+#
+# readability-identifier-length:
+#  Things like std::ostream os; nlohmann::json j; are popular. Reviewer can decide on those cases
+#
+# readability-implicit-bool-conversion:
+#  Makes packet-parsing (bool field that occupies a byte or bitfield) annoying
+#
+# hicpp-special-member-functions:
+#  Alias for cppcoreguidelines-special-member-functions, which is enabled. If both are enabled,
+#  the CheckOptions below have to be specified twice.
+#
+# hicpp-braces-around-statements:
+#  Alias for readability-braces-around-statements, which is enabled. If both are enabled,
+#  the CheckOptions below have to be specified twice.
+#
+# hicpp-signed-bitwise:
+#  This rule is buggy and flags bitwise operators on bools.
+#
+# hicpp-uppercase-literal-suffix:
+#  Alias for readability-uppercase-literal-suffix, which is disabled below.
+#
+# hicpp-use-auto:
+#  Alias for modernize-use-auto, which is disabled below.
+#
+# hicpp-vararg:
+#  RCLCPP_INFO/WARN/ERROR macros use C-style varargs internally.
+#
+# hicpp-no-array-decay:
+#  RCLCPP logging macros cause implicit array-to-pointer decay.
+#
+# llvm-header-guard:
+#  Conflicts with ROS 2 ament naming convention (PACKAGE_FILE_HPP).
+#
+# llvm-else-after-return:
+#  Alias for readability-else-after-return. Purely stylistic preference.
+#
+# llvm-namespace-comment:
+#  Purely stylistic. Not enforced in this project.
+#
+# cert-err58-cpp:
+#  Static logger initialization (rclcpp::get_logger) is standard ROS 2 practice.
+#
+# cert-err33-c:
+#  RCLCPP logging macros return values that are intentionally unchecked.
+#
+# cppcoreguidelines-pro-type-reinterpret-cast:
+#  Required for binary packet parsing (InnoDataPacket, InnoXyzPoint, etc.).
+#
+# cppcoreguidelines-pro-bounds-pointer-arithmetic:
+#  Required for argv parsing in main() and CLI argument handling.
+#
+# cppcoreguidelines-pro-type-union-access:
+#  Required for PCL point type registration macros (POINT_CLOUD_REGISTER_POINT_STRUCT).
+#
+# cppcoreguidelines-pro-type-vararg:
+#  Required for POSIX APIs (posix_fadvise) and RCLCPP logging macros.
+#
+# cppcoreguidelines-avoid-magic-numbers:
+#  Alias for readability-magic-numbers, which is disabled below.
+#
+# cppcoreguidelines-macro-usage:
+#  CHECK_ANGLEHV_TABLE_DATA macro is needed for SDK compatibility.
+#
+# cppcoreguidelines-virtual-class-destructor:
+#  False positive on template classes that already have `~override` destructors.
+#
+# readability-magic-numbers:
+#  Numeric constants in packet parsing and time conversion are self-documenting in context.
+#
+# readability-function-cognitive-complexity:
+#  Large argument-parsing and message-processing functions are unavoidably complex.
+#  IgnoreMacros is enabled in CheckOptions to reduce false positives from RCLCPP macros.
+#
+# readability-uppercase-literal-suffix:
+#  Purely stylistic (e.g. 1u vs 1U). Not enforced in this project.
+#
+# readability-container-data-pointer:
+#  Purely stylistic (&v[0] vs v.data()). Not enforced in this project.
+#
+# modernize-use-auto:
+#  Explicit types improve readability in reinterpret_cast expressions used for packet parsing.
+#
+# bugprone-exception-escape:
+#  main() uses rclcpp::init/shutdown which may throw; this is standard ROS 2 practice.
+#
+# bugprone-branch-clone:
+#  Intentionally identical branches in argument parsing (e.g. --merge and --delete both no-op
+#  in option loop since they were handled in pre-scan).
+Checks: "
+  *,
+  -abseil-*,
+  -altera-*,
+  -android-*,
+  -darwin-*,
+  -fuchsia-*,
+  -linuxkernel-*,
+  -llvmlibc-*,
+  -mpi-*,
+  -objc-*,
+  -zircon-*,
+  -bugprone-easily-swappable-parameters,
+  -modernize-use-trailing-return-type,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -hicpp-special-member-functions,
+  -hicpp-braces-around-statements,
+  -hicpp-signed-bitwise,
+  -hicpp-uppercase-literal-suffix,
+  -hicpp-use-auto,
+  -hicpp-vararg,
+  -hicpp-no-array-decay,
+  -llvm-header-guard,
+  -llvm-else-after-return,
+  -llvm-namespace-comment,
+  -cert-err58-cpp,
+  -cert-err33-c,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-virtual-class-destructor,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -readability-uppercase-literal-suffix,
+  -readability-container-data-pointer,
+  -modernize-use-auto,
+  -bugprone-exception-escape,
+  -bugprone-branch-clone"
+
+# WarningsAsErrors have been taken from:
+# https://github.com/autowarefoundation/autoware/blob/3591106/.clang-tidy-ci
+WarningsAsErrors: "
+  bugprone-dangling-handle,
+  bugprone-fold-init-type,
+  bugprone-inaccurate-erase,
+  bugprone-incorrect-roundings,
+  bugprone-misplaced-widening-cast,
+  bugprone-sizeof-container,
+  bugprone-sizeof-expression,
+  bugprone-string-constructor,
+  bugprone-suspicious-enum-usage,
+  bugprone-suspicious-memset-usage,
+  bugprone-suspicious-missing-comma,
+  bugprone-suspicious-semicolon,
+  bugprone-swapped-arguments,
+  bugprone-unchecked-optional-access,
+  bugprone-unused-raii,
+  bugprone-use-after-move,
+  bugprone-assert-side-effect,
+  bugprone-bad-signal-to-kill-thread,
+  bugprone-copy-constructor-init,
+  bugprone-dynamic-static-initializers,
+  bugprone-exception-escape,
+  bugprone-integer-division,
+  bugprone-macro-parentheses,
+  bugprone-macro-repeated-side-effects,
+  bugprone-misplaced-operator-in-strlen-in-alloc,
+  bugprone-move-forwarding-reference,
+  bugprone-multiple-statement-macro,
+  bugprone-not-null-terminated-result,
+  bugprone-parent-virtual-call,
+  bugprone-posix-return,
+  bugprone-signed-char-misuse,
+  bugprone-string-literal-with-embedded-nul,
+  bugprone-suspicious-string-compare,
+  bugprone-terminating-continue,
+  bugprone-throw-keyword-missing,
+  bugprone-too-small-loop-variable,
+  bugprone-undefined-memory-manipulation,
+  bugprone-undelegated-constructor,
+  bugprone-unhandled-self-assignment,
+  bugprone-unused-return-value,
+  bugprone-virtual-near-miss,
+  cppcoreguidelines-slicing,
+  cppcoreguidelines-special-member-functions,
+  cppcoreguidelines-pro-bounds-constant-array-index,
+  cppcoreguidelines-virtual-class-destructor,
+  cppcoreguidelines-init-variables,
+  cppcoreguidelines-narrowing-conversions,
+  google-build-explicit-make-pair,
+  google-build-namespaces,
+  google-explicit-constructor,
+  misc-non-copyable-objects,
+  misc-throw-by-value-catch-by-reference,
+  misc-definitions-in-headers,
+  misc-new-delete-overloads,
+  misc-redundant-expression,
+  misc-unconventional-assign-operator,
+  misc-uniqueptr-reset-release,
+  performance-inefficient-algorithm,
+  performance-move-const-arg,
+  performance-move-constructor-init,
+  performance-noexcept-move-constructor,
+  readability-simplify-boolean-expr"
+
+HeaderFilterRegex: ^(?!\/usr)(?!\/opt)
+
+FormatStyle: file
+
+CheckOptions:
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.PrivateMemberSuffix
+    value: _
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: lower_case
+  - key: readability-identifier-naming.GlobalConstantPrefix
+    value: g_
+  - key: readability-identifier-naming.ConstexprVariableCase
+    value: lower_case
+  - key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: true
+    # Structs (e.g. sensor config) with functions like to_json() would otherwise be flagged as warnings
+  - key: misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: true
+    # Reduce boilerplate for things like guard clauses
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: 2 # The definition is confusing, but everything >= 2 is flagged as a warning
+    # Macros like RCLCPP_INFO contribute large amounts to cognitive complexity, even if the
+    # containing function is simple.
+  - key: readability-function-cognitive-complexity.IgnoreMacros
+    value: true
