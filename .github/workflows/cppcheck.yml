@@ -1,0 +1,28 @@
+name: cppcheck
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        run: |
+          find src/bag_converter -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.c' \
+            | grep -v 'json\.hpp$' \
+            | xargs cppcheck \
+              --inline-suppr \
+              --suppressions-list=.cppcheck_suppressions \
+              --error-exitcode=1
