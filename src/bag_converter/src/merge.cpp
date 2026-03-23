@@ -189,6 +189,7 @@ static int64_t merge_group(
   writer.open(storage_options_out);
 
   // Create all topics
+  // cppcheck-suppress unusedVariable
   for (const auto & [topic_name, topic_meta] : topic_union.value()) {
     writer.create_topic(topic_meta);
   }
@@ -329,9 +330,7 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
     groups[key].push_back(bag_path);
 
     // Store extension from first file in group
-    if (group_extensions.find(key) == group_extensions.end()) {
-      group_extensions[key] = parsed->extension;
-    }
+    group_extensions.try_emplace(key, parsed->extension);
   }
 
   RCLCPP_INFO(g_logger, "Identified %zu merge groups", groups.size());

@@ -63,4 +63,15 @@ repos:
         exclude: >-
           ^(build/|install/|log/|.*\.(mcap|db3|pcd|bag|bin|so|a|o|dylib|dll|exe)|.*/json\.hpp$)
 
+  - repo: https://github.com/pocc/pre-commit-hooks
+    rev: v1.3.5
+    hooks:
+      - id: cppcheck
+        args:
+          - --inline-suppr
+          - --suppressions-list=.cppcheck_suppressions
+        types_or: [c++, c, cuda]
+        exclude: >-
+          ^(build/|install/|log/|.*\.(mcap|db3|pcd|bag|bin|so|a|o|dylib|dll|exe)|.*/json\.hpp$)
+
 exclude: .svg
