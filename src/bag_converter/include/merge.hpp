@@ -44,6 +44,7 @@ struct MergeConfig
 struct HeapEntry
 {
   std::shared_ptr<rosbag2_storage::SerializedBagMessage> message;
+  // cppcheck-suppress unusedStructMember
   size_t reader_index;
 };
 
