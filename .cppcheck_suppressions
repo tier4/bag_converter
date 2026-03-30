@@ -1,0 +1,9 @@
+checkersReport
+constStatement
+missingInclude
+missingIncludeSystem
+unknownMacro
+unmatchedSuppression
+unusedFunction
+useInitializationList
+useStlAlgorithm
