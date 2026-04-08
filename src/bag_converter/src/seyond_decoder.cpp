@@ -16,6 +16,7 @@
 
 #include <pcl_conversions/pcl_conversions.h>
 
+#include <algorithm>
 #include <cstring>
 #include <type_traits>
 
@@ -180,15 +181,26 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
 
     // Set intensity based on point type and configuration
     if constexpr (std::is_same<PointType, const InnoEnXyzPoint *>::value) {
-      point.intensity = is_use_refl ? static_cast<float>(point_ptr->reflectance)
-                                    : static_cast<float>(point_ptr->intensity);
+      float intensity_f = is_use_refl ? static_cast<float>(point_ptr->reflectance)
+                                      : static_cast<float>(point_ptr->intensity);
+      if (scale_intensity_12bit_) {
+        intensity_f = intensity_f * (255.0f / 4095.0f);
+      }
+      if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIRCAEDT>) {
+        point.intensity = static_cast<uint8_t>(std::min(intensity_f, 255.0f));
+      } else {
+        point.intensity = intensity_f;
+      }
     } else if constexpr (std::is_same<PointType, const InnoXyzPoint *>::value) {
-      point.intensity = static_cast<float>(point_ptr->refl);
-    }
-
-    // Scale 12-bit intensity [0, 4095] to 8-bit [0, 255] for Robin W protocol <= v3
-    if (scale_intensity_12bit_) {
-      point.intensity = point.intensity * (255.0f / 4095.0f);
+      float intensity_f = static_cast<float>(point_ptr->refl);
+      if (scale_intensity_12bit_) {
+        intensity_f = intensity_f * (255.0f / 4095.0f);
+      }
+      if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIRCAEDT>) {
+        point.intensity = static_cast<uint8_t>(std::min(intensity_f, 255.0f));
+      } else {
+        point.intensity = intensity_f;
+      }
     }
 
     // Set timestamp (relative time from scan start)
@@ -228,6 +240,20 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
 
       point.lidar_type = pkt_lidar_type_;
       point.flags |= fl::HAS_LIDAR_TYPE;
+    }
+    if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointXYZIRCAEDT>) {
+      namespace rt = bag_converter::point::return_type;
+      point.time_stamp = static_cast<uint32_t>((pkt_offset_us_ + point_ptr->ts_10us * 10) * 1000);
+      point.distance = point_ptr->radius;
+      point.azimuth = 0.0f;
+      point.elevation = 0.0f;
+      if constexpr (std::is_same_v<PointType, const InnoXyzPoint *>) {
+        point.return_type = point_ptr->is_2nd_return ? rt::SECONDSTRONGEST : rt::STRONGEST;
+        point.channel = point_ptr->ring_id;
+      } else if constexpr (std::is_same_v<PointType, const InnoEnXyzPoint *>) {
+        point.return_type = point_ptr->is_2nd_return ? rt::SECONDSTRONGEST : rt::STRONGEST;
+        point.channel = static_cast<uint16_t>(point_ptr->channel);
+      }
     }
 
     // Apply coordinate transformation (Autoware coordinate system)
@@ -272,6 +298,7 @@ void SeyondPCDDecoder<OutputPointT>::clear_angle_hv_table()
 template class SeyondPCDDecoder<bag_converter::point::PointXYZIT>;
 template class SeyondPCDDecoder<bag_converter::point::PointXYZI>;
 template class SeyondPCDDecoder<bag_converter::point::PointEnXYZIT>;
+template class SeyondPCDDecoder<bag_converter::point::PointXYZIRCAEDT>;
 
 // Explicit template instantiations for point_xyz_data_parse
 template void
@@ -292,5 +319,11 @@ SeyondPCDDecoder<bag_converter::point::PointEnXYZIT>::point_xyz_data_parse<const
 template void
 SeyondPCDDecoder<bag_converter::point::PointEnXYZIT>::point_xyz_data_parse<const InnoXyzPoint *>(
   bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointEnXYZIT> &);
+template void SeyondPCDDecoder<bag_converter::point::PointXYZIRCAEDT>::point_xyz_data_parse<
+  const InnoEnXyzPoint *>(
+  bool, uint32_t, const InnoEnXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIRCAEDT> &);
+template void
+SeyondPCDDecoder<bag_converter::point::PointXYZIRCAEDT>::point_xyz_data_parse<const InnoXyzPoint *>(
+  bool, uint32_t, const InnoXyzPoint *, pcl::PointCloud<bag_converter::point::PointXYZIRCAEDT> &);
 
 }  // namespace bag_converter::decoder::seyond

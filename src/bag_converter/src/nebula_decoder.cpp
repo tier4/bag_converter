@@ -181,5 +181,6 @@ sensor_msgs::msg::PointCloud2::SharedPtr NebulaPCDDecoder<OutputPointT>::decode_
 template class NebulaPCDDecoder<bag_converter::point::PointXYZIT>;
 template class NebulaPCDDecoder<bag_converter::point::PointXYZI>;
 template class NebulaPCDDecoder<bag_converter::point::PointEnXYZIT>;
+template class NebulaPCDDecoder<bag_converter::point::PointXYZIRCAEDT>;
 
 }  // namespace bag_converter::decoder::nebula

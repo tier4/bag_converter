@@ -19,7 +19,7 @@ namespace bag_converter
 /**
  * @brief Output point type for point cloud conversion
  */
-enum class PointType { kXYZIT, kXYZI, kEnXYZIT };
+enum class PointType { kXYZIT, kXYZI, kEnXYZIT, kNebula };
 
 }  // namespace bag_converter
 
@@ -110,6 +110,42 @@ struct EIGEN_ALIGN16 PointEnXYZIT
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+/// nebula ReturnType values used for PointXYZIRCAEDT.return_type
+namespace return_type
+{
+constexpr uint8_t UNKNOWN = 0;
+constexpr uint8_t STRONGEST = 3;
+constexpr uint8_t SECONDSTRONGEST = 8;
+}  // namespace return_type
+
+/**
+ * @brief Nebula-compatible point type: XYZ + intensity + return_type + channel + azimuth +
+ *        elevation + distance + time_stamp
+ *
+ * Matches nebula::drivers::PointXYZIRCAEDT layout for downstream compatibility with
+ * Autoware/nebula consumers.
+ *
+ * This point type intentionally does NOT use PCL_ADD_POINT4D to avoid a 32-bit dummy word,
+ * following nebula's design for SSE-aligned structs.
+ *
+ * Note: azimuth and elevation are always 0 because the decoder operates on XYZ-converted packets
+ * which do not retain the original spherical angles. This matches nebula's own decoder behavior.
+ */
+struct alignas(16) PointXYZIRCAEDT
+{
+  float x;
+  float y;
+  float z;
+  uint8_t intensity;    ///< Reflectance/intensity (0-255)
+  uint8_t return_type;  ///< nebula ReturnType (see return_type namespace)
+  uint16_t channel;     ///< Laser channel / ring ID
+  float azimuth;        ///< Horizontal angle (rad); always 0 (unavailable from XYZ packets)
+  float elevation;      ///< Vertical angle (rad); always 0 (unavailable from XYZ packets)
+  float distance;       ///< Distance from sensor origin (meters)
+  uint32_t time_stamp;  ///< Relative timestamp from scan start (nanoseconds)
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
 /**
  * @brief Convert PointType enum to string representation
  * @param point_type The point type enum value
@@ -124,6 +160,8 @@ inline const char * point_type_to_string(bag_converter::PointType point_type)
       return "xyzi";
     case bag_converter::PointType::kEnXYZIT:
       return "en_xyzit";
+    case bag_converter::PointType::kNebula:
+      return "nebula";
   }
   return "unknown";
 }
@@ -147,5 +185,12 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
     uint8_t, elongation, elongation)(uint8_t, lidar_status, lidar_status)(
     uint8_t, lidar_mode, lidar_mode)(uint8_t, pkt_version_major, pkt_version_major)(
     uint8_t, pkt_version_minor, pkt_version_minor)(uint8_t, lidar_type, lidar_type))
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(
+  bag_converter::point::PointXYZIRCAEDT,
+  (float, x, x)(float, y, y)(float, z, z)(std::uint8_t, intensity, intensity)(
+    std::uint8_t, return_type,
+    return_type)(std::uint16_t, channel, channel)(float, azimuth, azimuth)(
+    float, elevation, elevation)(float, distance, distance)(std::uint32_t, time_stamp, time_stamp))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP

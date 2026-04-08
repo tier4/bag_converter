@@ -312,7 +312,8 @@ void print_usage()
     << "  --keep-original           Keep original packet topics in output bag\n"
     << "  --min-range <value>       Minimum range in meters (default: 0.1)\n"
     << "  --max-range <value>       Maximum range in meters (default: 250.0)\n"
-    << "  --point-type <type>       Output point type: xyzit, xyzi, or en_xyzit (default: xyzit)\n"
+    << "  --point-type <type>       Output point type: xyzit, xyzi, en_xyzit, or nebula (default: "
+       "xyzit)\n"
     << "  --timescale-correction <on|off>  Enable/disable timescale correction (default: on)\n"
     << "  --timescale-correction-ref <utc|tai|gps>  Rosbag recording timescale (default: utc)\n"
     << "  --base-frame <frame>      Transform PointCloud2 to specified TF frame\n"
@@ -436,9 +437,11 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
         config.point_type = PointType::kXYZI;
       } else if (point_type_str == "en_xyzit") {
         config.point_type = PointType::kEnXYZIT;
+      } else if (point_type_str == "nebula") {
+        config.point_type = PointType::kNebula;
       } else {
         std::cerr << "Error: Invalid point type '" << point_type_str
-                  << "'. Must be 'xyzit', 'xyzi', or 'en_xyzit'.\n";
+                  << "'. Must be 'xyzit', 'xyzi', 'en_xyzit', or 'nebula'.\n";
         return 1;
       }
     } else if (arg == "--timescale-correction" && i + 1 < argc) {
@@ -939,6 +942,8 @@ static BagConverterResultStatus run_single(const BagConverterConfig & config)
       return run_impl<point::PointXYZIT>(config);
     case PointType::kEnXYZIT:
       return run_impl<point::PointEnXYZIT>(config);
+    case PointType::kNebula:
+      return run_impl<point::PointXYZIRCAEDT>(config);
   }
   return BagConverterResultStatus::kError;
 }
@@ -1384,6 +1389,9 @@ int run_merge_and_convert(const BagConverterConfig & config)
           bag_files, output_path, storage_identifier, config);
       case PointType::kEnXYZIT:
         return merge_and_convert_group<point::PointEnXYZIT>(
+          bag_files, output_path, storage_identifier, config);
+      case PointType::kNebula:
+        return merge_and_convert_group<point::PointXYZIRCAEDT>(
           bag_files, output_path, storage_identifier, config);
     }
     return -1;
