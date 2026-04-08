@@ -259,10 +259,17 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       }
       if constexpr (std::is_same_v<PointType, const InnoXyzPoint *>) {
         point.return_type = point_ptr->is_2nd_return ? rt::SECONDSTRONGEST : rt::STRONGEST;
-        point.channel = point_ptr->ring_id;
+        // scan_id contains the raw scan line ID from the block header.
+        // For Falcon-K1 this equals the logical ring ID (matching nebula's
+        // compute_falcon_k1_ring_id).
+        point.channel = point_ptr->scan_id;
       } else if constexpr (std::is_same_v<PointType, const InnoEnXyzPoint *>) {
         point.return_type = point_ptr->is_2nd_return ? rt::SECONDSTRONGEST : rt::STRONGEST;
-        point.channel = static_cast<uint16_t>(point_ptr->channel);
+        // The SDK's sphere→XYZ conversion already computes the logical ring ID into scan_id:
+        //   Falcon-K2: scan_id = block header scan_id (matching nebula's compute_falcon_k2_ring_id)
+        //   Robin-W:   scan_id = channel_mapping[block.scan_id * n_ch + ch] + facet * 48
+        //              (matching nebula's compute_robinw_ring_id)
+        point.channel = point_ptr->scan_id;
       }
     }
 
