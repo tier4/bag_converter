@@ -17,6 +17,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <type_traits>
 
@@ -245,8 +246,17 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       namespace rt = bag_converter::point::return_type;
       point.time_stamp = static_cast<uint32_t>((pkt_offset_us_ + point_ptr->ts_10us * 10) * 1000);
       point.distance = point_ptr->radius;
-      point.azimuth = 0.0f;
-      point.elevation = 0.0f;
+      // Recover azimuth and elevation from Seyond XYZ coordinates
+      // Seyond frame: x=up, y=right, z=forward
+      // azimuth (horizontal angle) = atan2(right, forward)
+      // elevation (vertical angle) = atan2(up, horizontal_distance)
+      {
+        const float sx = point_ptr->x;  // up
+        const float sy = point_ptr->y;  // right
+        const float sz = point_ptr->z;  // forward
+        point.azimuth = std::atan2(sy, sz);
+        point.elevation = std::atan2(sx, std::sqrt(sy * sy + sz * sz));
+      }
       if constexpr (std::is_same_v<PointType, const InnoXyzPoint *>) {
         point.return_type = point_ptr->is_2nd_return ? rt::SECONDSTRONGEST : rt::STRONGEST;
         point.channel = point_ptr->ring_id;
