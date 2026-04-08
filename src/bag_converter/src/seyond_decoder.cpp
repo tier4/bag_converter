@@ -246,15 +246,26 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       namespace rt = bag_converter::point::return_type;
       point.time_stamp = static_cast<uint32_t>((pkt_offset_us_ + point_ptr->ts_10us * 10) * 1000);
       point.distance = point_ptr->radius;
-      // Recover azimuth and elevation from Seyond XYZ coordinates
-      // Seyond frame: x=up, y=right, z=forward
-      // azimuth (horizontal angle) = atan2(right, forward)
-      // elevation (vertical angle) = atan2(up, horizontal_distance)
+      // Recover azimuth and elevation from Seyond XYZ coordinates.
+      // Seyond SDK frame: sx=up, sy=right, sz=forward
+      // Output frame (after coordinate_transfer): x=sz, y=-sy, z=sx
+      //
+      // Azimuth follows the Hesai convention used in nebula:
+      //   x_out = xy_dist * sin(azimuth)
+      //   y_out = xy_dist * cos(azimuth)
+      //   azimuth = atan2(x_out, y_out) = atan2(sz, -sy)
+      //   az=0 → +y_out, az>0 → +x_out, range [0, 2π)
+      //
+      // Elevation: angle above the horizontal plane (radians).
       {
         const float sx = point_ptr->x;  // up
         const float sy = point_ptr->y;  // right
         const float sz = point_ptr->z;  // forward
-        point.azimuth = std::atan2(sy, sz);
+        float az = std::atan2(sz, -sy);
+        if (az < 0.0f) {
+          az += 2.0f * static_cast<float>(M_PI);
+        }
+        point.azimuth = az;
         point.elevation = std::atan2(sx, std::sqrt(sy * sy + sz * sz));
       }
       if constexpr (std::is_same_v<PointType, const InnoXyzPoint *>) {
