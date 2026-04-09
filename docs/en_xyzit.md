@@ -1,6 +1,6 @@
 # en_xyzit point type
 
-The `en_xyzit` point type is an **experimental** extension of the default PointCloud2 output. Enable it with `--point-type en_xyzit`. It adds the same normal fields as `xyzit` (x, y, z, intensity, timestamp) plus extended properties for reflection classification, elongation, lidar status/mode, packet version, and lidar type.
+The `en_xyzit` point type is an **experimental** extension of the default PointCloud2 output. Enable it with `--point-type en_xyzit`. It adds the same normal fields as `xyzit` (x, y, z, intensity, time_stamp) plus extended properties for reflection classification, elongation, lidar status/mode, packet version, and lidar type.
 
 **Subject to change.** This document is the canonical reference for the layout and semantics of `en_xyzit`.
 

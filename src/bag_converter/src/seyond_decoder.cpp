@@ -194,13 +194,13 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
     // Set timestamp (relative time from scan start)
     // point_ptr->ts_10us is relative to the packet's ts_start_us (in 10us units)
     // pkt_offset_us_ is the packet's offset from scan start (in us)
-    // point.timestamp = (pkt_offset_us_ + ts_10us * 10) * 1000 = time from scan start in ns
-    // point.t_us = timestamp / 1000 = time from scan start in us (deprecated)
+    // point.time_stamp = (pkt_offset_us_ + ts_10us * 10) * 1000 = time from scan start in ns
+    // point.t_us = time_stamp / 1000 = time from scan start in us (deprecated)
     if constexpr (
       std::is_same_v<OutputPointT, bag_converter::point::PointXYZIT> ||
       std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
-      point.timestamp = static_cast<uint32_t>((pkt_offset_us_ + point_ptr->ts_10us * 10) * 1000);
-      point.t_us = point.timestamp / 1000;
+      point.time_stamp = static_cast<uint32_t>((pkt_offset_us_ + point_ptr->ts_10us * 10) * 1000);
+      point.t_us = point.time_stamp / 1000;
     }
     if constexpr (std::is_same_v<OutputPointT, bag_converter::point::PointEnXYZIT>) {
       namespace fl = bag_converter::point::en_xyzit_flags;
