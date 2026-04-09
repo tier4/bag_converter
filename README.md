@@ -88,6 +88,7 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 | `--overwrite`                      | Overwrite existing output files. By default, conversion is skipped if the output file already exists.                                                                                                                                  |
 | `--merge`                          | Merge bag files from distributed log modules and convert in a single pass. Accepts multiple input directories. The last positional argument is the output directory.                                                                   |
 | `--delete`                         | Delete source bag files after successful processing. In merge mode, deletes the original input bag files after each group is successfully merged and converted.                                                                        |
+| `--delete-unmatched`               | In merge mode, delete source bag files for groups with only a single file (no merge partner) after successful conversion. Can be combined with `--delete`.                                                                             |
 
 The `--base-frame` option transforms all output PointCloud2 messages to the specified coordinate frame using TF data (`tf2_msgs/msg/TFMessage`) from the input bag. The `--tf-mode` option controls how TF data is handled:
 
@@ -110,7 +111,7 @@ Input files must follow the naming pattern:
 - `module_id`: Log module / ECU identifier (no underscores)
 - `rest`: Remaining part (e.g., timestamp), can contain underscores
 
-Files with the same `sensing_system_id` and `rest` are grouped and merged into a single output bag. The output filename drops `module_id`: `<sensing_system_id>_<rest>.<ext>`. Messages are interleaved in timestamp order. Files that do not match the pattern or groups with only a single file are skipped.
+Files with the same `sensing_system_id` and `rest` are grouped and merged into a single output bag. The output filename drops `module_id`: `<sensing_system_id>_<rest>.<ext>`. Messages are interleaved in timestamp order. Groups with only a single file (no merge partner) are still processed — their LiDAR packets are decoded to PointCloud2 as normal. Files that do not match the naming pattern are skipped.
 
 All conversion options (e.g., `--point-type`, `--base-frame`) are applied during the merge. Use `--delete` to remove the original input bag files after each group is successfully processed.
 
