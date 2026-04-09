@@ -123,6 +123,9 @@ struct BagConverterConfig
   // Delete source files after successful conversion
   bool delete_sources = false;
 
+  // Delete source files for single-file groups (no merge partner) after successful conversion
+  bool delete_unmatched = false;
+
   // Batch mode
   bool batch_mode = false;
 

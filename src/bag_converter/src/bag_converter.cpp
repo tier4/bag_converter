@@ -177,6 +177,9 @@ void print_usage()
     << "  --delete                  Delete source bag files after successful processing.\n"
     << "                            In merge mode, deletes the original input bag files\n"
     << "                            after each group is successfully merged and converted.\n"
+    << "  --delete-unmatched        In merge mode, delete source bag files for groups\n"
+    << "                            with only a single file (no merge partner) after\n"
+    << "                            successful conversion.\n"
     << "  -h, --help                Show this help message\n"
     << "  -v, --version             Show version information\n";
 }
@@ -215,6 +218,9 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
     }
     if (arg == "--delete") {
       config.delete_sources = true;
+    }
+    if (arg == "--delete-unmatched") {
+      config.delete_unmatched = true;
     }
   }
 
@@ -339,7 +345,7 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       config.passthrough = true;
     } else if (arg == "--overwrite") {
       config.overwrite = true;
-    } else if (arg == "--merge" || arg == "--delete") {
+    } else if (arg == "--merge" || arg == "--delete" || arg == "--delete-unmatched") {
       // Already processed in pre-scan
     } else if (arg == "--help" || arg == "-h" || arg == "--version" || arg == "-v") {
       // Already handled
@@ -1204,6 +1210,7 @@ int run_merge_and_convert(const BagConverterConfig & config)
   merge_config.output_dir = config.dst_bag_path;
   merge_config.overwrite = config.overwrite;
   merge_config.delete_sources = config.delete_sources;
+  merge_config.delete_unmatched = config.delete_unmatched;
   merge_config.comp_algo = config.comp_algo;
   merge_config.comp_level = config.comp_level;
 
