@@ -56,11 +56,12 @@ inline const std::set<std::string> kTypesWithHeader = {
 };
 
 /**
- * @brief Extract header.stamp by deserializing the message.
+ * @brief Extract header.stamp directly from CDR-serialized bytes.
  *
- * For types in kTypesWithHeader, deserializes to the concrete message type and
- * returns header.stamp. Returns std::nullopt if the type is unsupported or
- * deserialization fails.
+ * For types in kTypesWithHeader (all have Header as first field), reads
+ * stamp.sec and stamp.nanosec from fixed CDR byte offsets without full
+ * deserialization. Returns std::nullopt if the type is unsupported, the
+ * buffer is too small, or the CDR encoding is not little-endian.
  */
 std::optional<rclcpp::Time> extract_header_stamp(
   const rcutils_uint8_array_t & serialized_data, const std::string & topic_type);
