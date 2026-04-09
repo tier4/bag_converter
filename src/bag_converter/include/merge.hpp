@@ -34,6 +34,7 @@ struct MergeConfig
   std::string output_dir;
   bool overwrite = false;
   bool delete_sources = false;
+  bool delete_unmatched = false;
   std::string comp_algo = "zstd";
   std::string comp_level = "default";
 };

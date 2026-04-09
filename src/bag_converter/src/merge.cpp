@@ -66,7 +66,7 @@ struct MergeGroupKey
 struct MergeResult
 {
   size_t merged_count = 0;
-  size_t skipped_single_count = 0;
+  size_t skipped_exists_count = 0;
   size_t skipped_pattern_count = 0;
   size_t failed_count = 0;
   size_t total_messages = 0;
@@ -252,7 +252,7 @@ static void print_merge_summary(const MergeResult & result)
 {
   RCLCPP_INFO(g_logger, "========== Merge Summary ==========");
   RCLCPP_INFO(g_logger, "  Groups merged: %zu", result.merged_count);
-  RCLCPP_INFO(g_logger, "  Groups skipped (single file): %zu", result.skipped_single_count);
+  RCLCPP_INFO(g_logger, "  Groups skipped (output exists): %zu", result.skipped_exists_count);
   RCLCPP_INFO(g_logger, "  Files skipped (pattern mismatch): %zu", result.skipped_pattern_count);
   RCLCPP_INFO(g_logger, "  Groups failed: %zu", result.failed_count);
   RCLCPP_INFO(g_logger, "  Total messages merged: %zu", result.total_messages);
@@ -345,13 +345,6 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
 
     std::string group_name = key.sensing_system_id + "_" + key.rest;
 
-    if (files.size() < 2) {
-      RCLCPP_WARN(
-        g_logger, "Skipping group '%s' (single file, nothing to merge)", group_name.c_str());
-      ++result.skipped_single_count;
-      continue;
-    }
-
     // Determine output path
     std::string output_filename = group_name + group_extensions[key];
     fs::path output_path = output_dir / output_filename;
@@ -362,7 +355,7 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
           g_logger,
           "Output file already exists, skipping group '%s': %s (use --overwrite to replace)",
           group_name.c_str(), output_path.string().c_str());
-        ++result.skipped_single_count;
+        ++result.skipped_exists_count;
         continue;
       }
       RCLCPP_INFO(g_logger, "Removing existing output file: %s", output_path.string().c_str());
@@ -403,7 +396,9 @@ int run_merge(const MergeConfig & config, MergeGroupProcessor processor)
     result.total_messages += static_cast<size_t>(msg_count);
 
     // Delete source files if requested
-    if (config.delete_sources) {
+    const bool should_delete =
+      config.delete_sources || (config.delete_unmatched && files.size() == 1);
+    if (should_delete) {
       for (const auto & f : files) {
         std::error_code del_ec;
         fs::remove(f, del_ec);
