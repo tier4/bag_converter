@@ -57,6 +57,7 @@ endif()
 # Build unified bag_converter executable
 add_executable(bag_converter_bin
   src/bag_converter.cpp
+  src/header_stamp.cpp
   src/memory_management.cpp
   src/merge.cpp
   src/seyond_decoder.cpp

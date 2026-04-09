@@ -13,28 +13,8 @@
 #include "merge.hpp"
 #include "tf_transformer.hpp"
 
-#include <seyond/msg/seyond_scan.hpp>
-
-#include <can_msgs/msg/frame.hpp>
-#include <geometry_msgs/msg/accel_stamped.hpp>
-#include <geometry_msgs/msg/pose_stamped.hpp>
-#include <geometry_msgs/msg/twist_stamped.hpp>
-#include <geometry_msgs/msg/wrench_stamped.hpp>
-#include <nav_msgs/msg/odometry.hpp>
-#include <nebula_msgs/msg/nebula_packets.hpp>
-#include <oxts_msgs/msg/imu_bias.hpp>
-#include <oxts_msgs/msg/lever_arm.hpp>
-#include <oxts_msgs/msg/nav_sat_ref.hpp>
-#include <oxts_msgs/msg/ncom.hpp>
-#include <sensor_msgs/msg/camera_info.hpp>
-#include <sensor_msgs/msg/compressed_image.hpp>
-#include <sensor_msgs/msg/image.hpp>
-#include <sensor_msgs/msg/imu.hpp>
-#include <sensor_msgs/msg/laser_scan.hpp>
-#include <sensor_msgs/msg/nav_sat_fix.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
-
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -49,147 +29,6 @@ static const rclcpp::Logger g_logger = rclcpp::get_logger("bag_converter");
 
 namespace bag_converter
 {
-
-/**
- * @brief Extract header.stamp by deserializing the message.
- *
- * For types in kTypesWithHeader, deserializes to the concrete message type and
- * returns header.stamp. Returns std::nullopt if the type is unsupported or
- * deserialization fails.
- */
-static std::optional<rclcpp::Time> extract_header_stamp(
-  const rcutils_uint8_array_t & serialized_data, const std::string & topic_type)
-{
-  if (kTypesWithHeader.find(topic_type) == kTypesWithHeader.end()) {
-    return std::nullopt;
-  }
-  try {
-    rclcpp::SerializedMessage serialized_msg(serialized_data);
-    // sensor_msgs
-    if (topic_type == "sensor_msgs/msg/CameraInfo") {
-      sensor_msgs::msg::CameraInfo msg;
-      rclcpp::Serialization<sensor_msgs::msg::CameraInfo> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "sensor_msgs/msg/CompressedImage") {
-      sensor_msgs::msg::CompressedImage msg;
-      rclcpp::Serialization<sensor_msgs::msg::CompressedImage> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "sensor_msgs/msg/Imu") {
-      sensor_msgs::msg::Imu msg;
-      rclcpp::Serialization<sensor_msgs::msg::Imu> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "sensor_msgs/msg/Image") {
-      sensor_msgs::msg::Image msg;
-      rclcpp::Serialization<sensor_msgs::msg::Image> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "sensor_msgs/msg/LaserScan") {
-      sensor_msgs::msg::LaserScan msg;
-      rclcpp::Serialization<sensor_msgs::msg::LaserScan> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "sensor_msgs/msg/NavSatFix") {
-      sensor_msgs::msg::NavSatFix msg;
-      rclcpp::Serialization<sensor_msgs::msg::NavSatFix> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "sensor_msgs/msg/PointCloud2") {
-      sensor_msgs::msg::PointCloud2 msg;
-      rclcpp::Serialization<sensor_msgs::msg::PointCloud2> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    // geometry_msgs
-    if (topic_type == "geometry_msgs/msg/AccelStamped") {
-      geometry_msgs::msg::AccelStamped msg;
-      rclcpp::Serialization<geometry_msgs::msg::AccelStamped> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "geometry_msgs/msg/PoseStamped") {
-      geometry_msgs::msg::PoseStamped msg;
-      rclcpp::Serialization<geometry_msgs::msg::PoseStamped> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "geometry_msgs/msg/TwistStamped") {
-      geometry_msgs::msg::TwistStamped msg;
-      rclcpp::Serialization<geometry_msgs::msg::TwistStamped> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "geometry_msgs/msg/WrenchStamped") {
-      geometry_msgs::msg::WrenchStamped msg;
-      rclcpp::Serialization<geometry_msgs::msg::WrenchStamped> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    // nav_msgs
-    if (topic_type == "nav_msgs/msg/Odometry") {
-      nav_msgs::msg::Odometry msg;
-      rclcpp::Serialization<nav_msgs::msg::Odometry> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    // can_msgs
-    if (topic_type == "can_msgs/msg/Frame") {
-      can_msgs::msg::Frame msg;
-      rclcpp::Serialization<can_msgs::msg::Frame> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    // oxts_msgs
-    if (topic_type == "oxts_msgs/msg/ImuBias") {
-      oxts_msgs::msg::ImuBias msg;
-      rclcpp::Serialization<oxts_msgs::msg::ImuBias> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "oxts_msgs/msg/LeverArm") {
-      oxts_msgs::msg::LeverArm msg;
-      rclcpp::Serialization<oxts_msgs::msg::LeverArm> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "oxts_msgs/msg/NavSatRef") {
-      oxts_msgs::msg::NavSatRef msg;
-      rclcpp::Serialization<oxts_msgs::msg::NavSatRef> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "oxts_msgs/msg/Ncom") {
-      oxts_msgs::msg::Ncom msg;
-      rclcpp::Serialization<oxts_msgs::msg::Ncom> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    // LiDAR packet types
-    if (topic_type == "nebula_msgs/msg/NebulaPackets") {
-      nebula_msgs::msg::NebulaPackets msg;
-      rclcpp::Serialization<nebula_msgs::msg::NebulaPackets> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-    if (topic_type == "seyond/msg/SeyondScan") {
-      seyond::msg::SeyondScan msg;
-      rclcpp::Serialization<seyond::msg::SeyondScan> ser;
-      ser.deserialize_message(&serialized_msg, &msg);
-      return rclcpp::Time(msg.header.stamp);
-    }
-  } catch (...) {
-    return std::nullopt;
-  }
-  return std::nullopt;
-}
 
 /**
  * @brief Override log_time with header.stamp for a pass-through message.
@@ -792,7 +631,6 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
     return BagConverterResultStatus::kError;
   }
   // Create output topics based on input metadata
-  std::set<std::string> created_topics;
   for (const auto & topic_info : bag_metadata.topics_with_message_count) {
     const auto & topic_metadata = topic_info.topic_metadata;
     const auto & topic_type = topic_metadata.type;
@@ -816,15 +654,12 @@ BagConverterResultStatus run_impl(const BagConverterConfig & config)
       pc_topic_meta.type = "sensor_msgs/msg/PointCloud2";
       pc_topic_meta.serialization_format = "cdr";
       writer.create_topic(pc_topic_meta);
-      created_topics.insert(output_topic);
 
       if (config.keep_original_topics) {
         writer.create_topic(topic_metadata);
-        created_topics.insert(topic_metadata.name);
       }
     } else {
       writer.create_topic(topic_metadata);
-      created_topics.insert(topic_metadata.name);
     }
   }
 
