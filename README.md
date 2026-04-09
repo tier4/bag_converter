@@ -192,7 +192,7 @@ The output bag file contains `sensor_msgs::msg::PointCloud2` messages on topics 
 - `x` (float32): X coordinate in meters
 - `y` (float32): Y coordinate in meters
 - `z` (float32): Z coordinate in meters
-- `intensity` (float32): Intensity value in [0.0, 255.0]
+- `intensity` (uint8): Intensity value in [0, 255]. Robin W uses packet-version-dependent scaling; see [docs/seyond_intensity_scaling.md](docs/seyond_intensity_scaling.md).
 - `t_us` (uint32): Relative timestamp in microseconds from the scan start time (xyzit, en_xyzit only). **Will be removed in v1.0.0**; use `time_stamp` instead.
 - `time_stamp` (uint32): Relative timestamp in nanoseconds from the scan start time (xyzit, en_xyzit only)
 

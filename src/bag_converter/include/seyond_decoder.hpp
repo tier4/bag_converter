@@ -104,8 +104,10 @@ private:
   uint8_t pkt_version_major_;
   uint8_t pkt_version_minor_;
 
-  // Whether intensity needs to be scaled from [0, 4095] to [0, 255]
-  bool scale_intensity_12bit_ = false;
+  // Robin W: map raw intensity/reflectance to [0, 255] using full-scale 4095 (major <= 3) or
+  // 255 (major >= 4). Zero means "not Robin W" (pass raw through). Same for reflectance and
+  // intensity field selection in InnoEnXyzPoint, and InnoXyzPoint::refl.
+  float robin_w_intensity_scale_ = 0.0F;
 
   // Reusable point cloud buffer (avoids per-scan heap allocation)
   pcl::PointCloud<OutputPointT> cloud_;

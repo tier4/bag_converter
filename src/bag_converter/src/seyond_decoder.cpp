@@ -16,6 +16,8 @@
 
 #include <pcl_conversions/pcl_conversions.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <type_traits>
 
@@ -144,9 +146,13 @@ void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
   pkt_version_major_ = pkt->common.version.major_version;
   pkt_version_minor_ = pkt->common.version.minor_version;
 
-  // Robin W with protocol major version <= 3 reports intensity in [0, 4095]
-  scale_intensity_12bit_ =
-    (pkt->common.lidar_type == INNO_LIDAR_TYPE_ROBINW && pkt->common.version.major_version <= 3);
+  // Robin W: normalize to uint8 range using full-scale 4095 (protocol major <= 3) or 255 (>= 4).
+  if (pkt->common.lidar_type == INNO_LIDAR_TYPE_ROBINW) {
+    robin_w_intensity_scale_ =
+      (pkt->common.version.major_version <= 3) ? (255.0F / 4095.0F) : (255.0F / 255.0F);
+  } else {
+    robin_w_intensity_scale_ = 0.0F;
+  }
 
   // Parse point data based on packet type (different lidars use different structures)
   if (CHECK_EN_XYZ_POINTCLOUD_DATA(pkt->type)) {
@@ -178,18 +184,20 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
 
     OutputPointT point;
 
-    // Set intensity based on point type and configuration
+    // Set intensity based on point type and configuration (float pipeline, then uint8 storage)
+    float intensity_value = 0.0F;
     if constexpr (std::is_same<PointType, const InnoEnXyzPoint *>::value) {
-      point.intensity = is_use_refl ? static_cast<float>(point_ptr->reflectance)
+      intensity_value = is_use_refl ? static_cast<float>(point_ptr->reflectance)
                                     : static_cast<float>(point_ptr->intensity);
     } else if constexpr (std::is_same<PointType, const InnoXyzPoint *>::value) {
-      point.intensity = static_cast<float>(point_ptr->refl);
+      intensity_value = static_cast<float>(point_ptr->refl);
     }
 
-    // Scale 12-bit intensity [0, 4095] to 8-bit [0, 255] for Robin W protocol <= v3
-    if (scale_intensity_12bit_) {
-      point.intensity = point.intensity * (255.0f / 4095.0f);
+    if (robin_w_intensity_scale_ > 0.0F) {
+      intensity_value *= robin_w_intensity_scale_;
     }
+    point.intensity =
+      static_cast<std::uint8_t>(std::lround(std::clamp(intensity_value, 0.0F, 255.0F)));
 
     // Set timestamp (relative time from scan start)
     // point_ptr->ts_10us is relative to the packet's ts_start_us (in 10us units)
