@@ -39,12 +39,12 @@ namespace bag_converter::point
  * This point type is used for point cloud conversion in bag files.
  * It includes:
  * - x, y, z coordinates (float)
- * - intensity (float)
+ * - intensity (uint8_t, 0–255)
  */
 struct EIGEN_ALIGN16 PointXYZI
 {
   PCL_ADD_POINT4D;
-  float intensity;
+  std::uint8_t intensity;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -54,7 +54,7 @@ struct EIGEN_ALIGN16 PointXYZI
  * This point type is used for point cloud conversion in bag files.
  * It includes:
  * - x, y, z coordinates (float)
- * - intensity (float)
+ * - intensity (uint8_t, 0–255)
  * - t_us: [DEPRECATED, will be removed in v0.6.0] Replaced by `time_stamp`.
  *         Relative timestamp from scan start in microseconds (uint32_t)
  * - time_stamp: relative timestamp from scan start in nanoseconds (uint32_t)
@@ -62,7 +62,7 @@ struct EIGEN_ALIGN16 PointXYZI
 struct EIGEN_ALIGN16 PointXYZIT
 {
   PCL_ADD_POINT4D;
-  float intensity;
+  std::uint8_t intensity;
   uint32_t t_us;  ///< @deprecated Will be removed in v0.6.0. Replaced by `time_stamp`.
   uint32_t time_stamp;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -87,7 +87,7 @@ constexpr uint16_t HAS_LIDAR_TYPE = 1u << 6;
  * Experimental. Extended fields use an availability mask (flags) and minimal unsigned types.
  * When a property is not supported, its flag bit is 0 and the value is 0 (must be ignored).
  *
- * Base: x, y, z (float), intensity (float), t_us (deprecated), time_stamp (uint32_t).
+ * Base: x, y, z (float), intensity (uint8_t, 0–255), t_us (deprecated), time_stamp (uint32_t).
  * Extended (all uint8_t except flags): flags, refl_type (0-2), elongation (0-15),
  * lidar_status (0-3), lidar_mode (0-9), pkt_version_major/minor (0-255), lidar_type (0-7).
  * Value when not supported: 0.
@@ -95,7 +95,7 @@ constexpr uint16_t HAS_LIDAR_TYPE = 1u << 6;
 struct EIGEN_ALIGN16 PointEnXYZIT
 {
   PCL_ADD_POINT4D;
-  float intensity;
+  std::uint8_t intensity;
   uint32_t t_us;  ///< @deprecated Will be removed in v0.6.0. Replaced by `time_stamp`.
   uint32_t time_stamp;
   uint16_t flags;        ///< en_xyzit_flags: which extended fields are valid
@@ -133,16 +133,16 @@ inline const char * point_type_to_string(bag_converter::PointType point_type)
 // Register point types with PCL
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointXYZI,
-  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity))
+  (float, x, x)(float, y, y)(float, z, z)(std::uint8_t, intensity, intensity))
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointXYZIT,
-  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
+  (float, x, x)(float, y, y)(float, z, z)(std::uint8_t, intensity, intensity)(uint32_t, t_us, t_us)(
     uint32_t, time_stamp, time_stamp))
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointEnXYZIT,
-  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
+  (float, x, x)(float, y, y)(float, z, z)(std::uint8_t, intensity, intensity)(uint32_t, t_us, t_us)(
     uint32_t, time_stamp, time_stamp)(uint16_t, flags, flags)(uint8_t, refl_type, refl_type)(
     uint8_t, elongation, elongation)(uint8_t, lidar_status, lidar_status)(
     uint8_t, lidar_mode, lidar_mode)(uint8_t, pkt_version_major, pkt_version_major)(

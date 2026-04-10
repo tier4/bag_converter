@@ -11,6 +11,7 @@
 
 #include "memory_management.hpp"
 #include "merge.hpp"
+#include "remove_stale_temp_dir.hpp"
 #include "tf_transformer.hpp"
 
 #include <algorithm>
@@ -21,6 +22,7 @@
 #include <iostream>
 #include <queue>
 #include <set>
+#include <system_error>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -1055,19 +1057,10 @@ static int64_t merge_and_convert_group(
   }
 
   // 4. Remove stale temp directory
-  fs::path temp_dir = output_path.string() + "_tmp";
-  std::error_code ec;
-  if (fs::exists(temp_dir)) {
-    RCLCPP_WARN(
-      g_logger, "Removing stale temp directory from previous run: %s", temp_dir.string().c_str());
-    fs::remove_all(temp_dir, ec);
-    if (ec) {
-      RCLCPP_ERROR(
-        g_logger, "Failed to remove stale temp directory '%s': %s", temp_dir.string().c_str(),
-        ec.message().c_str());
-      return -1;
-    }
+  if (!remove_stale_temp_dir_if_exists(output_path, g_logger)) {
+    return -1;
   }
+  const fs::path temp_dir = output_path.string() + "_tmp";
 
   // 5. Open writer
   rosbag2_storage::StorageOptions storage_options_out;
@@ -1129,6 +1122,7 @@ static int64_t merge_and_convert_group(
   rclcpp::Serialization<sensor_msgs::msg::PointCloud2> pc2_serializer;
   std::map<std::string, std::unique_ptr<decoder::BasePCDDecoder>> decoders;
   std::map<std::string, BagConverterStats> conversion_stats;
+  std::error_code ec;
 
   // 9. K-way merge loop with inline conversion
   int64_t message_count = 0;

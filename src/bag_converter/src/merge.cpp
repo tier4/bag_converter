@@ -9,6 +9,7 @@
 #include "merge.hpp"
 
 #include "bag_converter.hpp"
+#include "remove_stale_temp_dir.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <rosbag2_cpp/reader.hpp>
@@ -163,20 +164,10 @@ static int64_t merge_group(
     return -1;
   }
 
-  // Remove stale temp directory from previous failed runs
-  fs::path temp_dir = output_path.string() + "_tmp";
-  std::error_code ec;
-  if (fs::exists(temp_dir)) {
-    RCLCPP_WARN(
-      g_logger, "Removing stale temp directory from previous run: %s", temp_dir.string().c_str());
-    fs::remove_all(temp_dir, ec);
-    if (ec) {
-      RCLCPP_ERROR(
-        g_logger, "Failed to remove stale temp directory '%s': %s", temp_dir.string().c_str(),
-        ec.message().c_str());
-      return -1;
-    }
+  if (!remove_stale_temp_dir_if_exists(output_path, g_logger)) {
+    return -1;
   }
+  const fs::path temp_dir = output_path.string() + "_tmp";
 
   // Open writer
   rosbag2_storage::StorageOptions storage_options_out;
