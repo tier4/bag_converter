@@ -148,7 +148,10 @@ void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
   pkt_use_reflectance_ = static_cast<uint8_t>(pkt->use_reflectance);
 
   // Robin W: normalize to uint8 range using full-scale 4095 (protocol major <= 3) or 255 (>= 4).
-  if (pkt->common.lidar_type == INNO_LIDAR_TYPE_ROBINW) {
+  // When config_.no_intensity_scaling is set, scaling is disabled (scale == 0 means "pass raw").
+  if (config_.no_intensity_scaling) {
+    robin_w_intensity_scale_ = 0.0F;
+  } else if (pkt->common.lidar_type == INNO_LIDAR_TYPE_ROBINW) {
     robin_w_intensity_scale_ =
       (pkt->common.version.major_version <= 3) ? (255.0F / 4095.0F) : (255.0F / 255.0F);
   } else {
@@ -197,7 +200,8 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
     if (robin_w_intensity_scale_ > 0.0F) {
       intensity_value *= robin_w_intensity_scale_;
     }
-    point.intensity = std::clamp(intensity_value, 0.0F, 255.0F);
+    point.intensity =
+      config_.no_intensity_scaling ? intensity_value : std::clamp(intensity_value, 0.0F, 255.0F);
 
     // Set timestamp (relative time from scan start)
     // point_ptr->ts_10us is relative to the packet's ts_start_us (in 10us units)

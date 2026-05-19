@@ -154,6 +154,9 @@ void print_usage()
     << "  --min-range <value>       Minimum range in meters (default: 0.1)\n"
     << "  --max-range <value>       Maximum range in meters (default: 250.0)\n"
     << "  --point-type <type>       Output point type: xyzit, xyzi, or en_xyzit (default: xyzit)\n"
+    << "  --no-intensity-scaling    Emit raw intensity/reflectance values from the sensor\n"
+    << "                            packet without Robin W normalization or the [0, 255]\n"
+    << "                            clamp. Seyond decoder only; no effect for Nebula.\n"
     << "  --timescale-correction <on|off>  Enable/disable timescale correction (default: on)\n"
     << "  --timescale-correction-ref <utc|tai|gps>  Rosbag recording timescale (default: utc)\n"
     << "  --base-frame <frame>      Transform PointCloud2 to specified TF frame\n"
@@ -343,6 +346,8 @@ std::optional<int> parse_arguments(int argc, char ** argv, BagConverterConfig & 
       }
     } else if (arg == "--use-header-stamp-as-log-time") {
       config.use_header_stamp_as_log_time = true;
+    } else if (arg == "--no-intensity-scaling") {
+      config.no_intensity_scaling = true;
     } else if (arg == "--passthrough") {
       config.passthrough = true;
     } else if (arg == "--overwrite") {
@@ -430,6 +435,7 @@ std::unique_ptr<decoder::BasePCDDecoder> create_decoder(
       decoder::seyond::SeyondPCDDecoderConfig decoder_config;
       decoder_config.min_range = config.min_range;
       decoder_config.max_range = config.max_range;
+      decoder_config.no_intensity_scaling = config.no_intensity_scaling;
 
       std::string output_topic =
         generate_output_topic(topic_name, "/seyond_packets", "/seyond_points");
@@ -792,6 +798,7 @@ static void log_config(const BagConverterConfig & config)
   RCLCPP_INFO(g_logger, "  Min range: %.1f m", config.min_range);
   RCLCPP_INFO(g_logger, "  Max range: %.1f m", config.max_range);
   RCLCPP_INFO(g_logger, "  Point type: %s", point::point_type_to_string(config.point_type));
+  RCLCPP_INFO(g_logger, "  Intensity scaling: %s", config.no_intensity_scaling ? "off" : "on");
   RCLCPP_INFO(g_logger, "  Keep original topics: %s", config.keep_original_topics ? "yes" : "no");
   RCLCPP_INFO(g_logger, "  Timescale correction: %s", config.timescale_correction ? "on" : "off");
   RCLCPP_INFO(g_logger, "  Timescale correction ref: %s", config.timescale_correction_ref.c_str());

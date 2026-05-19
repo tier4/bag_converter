@@ -10,4 +10,10 @@ Decoder: **`SeyondPCDDecoder`** — [seyond_decoder.cpp](../src/bag_converter/sr
 
 After scaling (or when none), values are clamped to [0, 255] and written as `float`.
 
+## Disabling intensity scaling
+
+Pass `--no-intensity-scaling` on the CLI to bypass both the Robin W multiplier and the [0, 255] clamp. The decoder then writes the raw sensor field value (`InnoEnXyzPoint::intensity` / `reflectance`, or `InnoXyzPoint::refl`) into `point.intensity` as a `float`. This is useful for raw-data analysis or debugging; downstream consumers must be ready to handle values outside [0, 255] (Robin W raw ≤ 4095, Falcon raw ≤ 65535).
+
+The flag has no effect on the Nebula decoder, which does not perform intensity scaling.
+
 Packet header layout: [seyond_packet_protocol_versions.md](seyond_packet_protocol_versions.md).

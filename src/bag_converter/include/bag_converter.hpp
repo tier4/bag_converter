@@ -99,6 +99,11 @@ struct BagConverterConfig
   // Output point type
   PointType point_type = PointType::kXYZIT;
 
+  // Disable intensity scaling: when true, the Seyond decoder emits the raw
+  // intensity/reflectance value from the sensor packet without Robin W
+  // normalization or the [0, 255] clamp. No effect on the Nebula decoder.
+  bool no_intensity_scaling = false;
+
   // Timescale correction
   bool timescale_correction = true;
   std::string timescale_correction_ref = "utc";
