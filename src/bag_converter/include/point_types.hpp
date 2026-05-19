@@ -55,15 +55,12 @@ struct EIGEN_ALIGN16 PointXYZI
  * It includes:
  * - x, y, z coordinates (float)
  * - intensity (float, 0–255)
- * - t_us: [DEPRECATED, will be removed in v0.6.0] Replaced by `time_stamp`.
- *         Relative timestamp from scan start in microseconds (uint32_t)
  * - time_stamp: relative timestamp from scan start in nanoseconds (uint32_t)
  */
 struct EIGEN_ALIGN16 PointXYZIT
 {
   PCL_ADD_POINT4D;
   float intensity;
-  uint32_t t_us;  ///< @deprecated Will be removed in v1.0.0. Replaced by `time_stamp`.
   uint32_t time_stamp;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
@@ -90,7 +87,7 @@ constexpr uint16_t HAS_USE_REFLECTANCE = 1u << 9;
  * Experimental. Extended fields use an availability mask (flags) and minimal unsigned types.
  * When a property is not supported, its flag bit is 0 and the value is 0 (must be ignored).
  *
- * Base: x, y, z (float), intensity (float, 0–255), t_us (deprecated), time_stamp (uint32_t).
+ * Base: x, y, z (float), intensity (float, 0–255), time_stamp (uint32_t).
  * Extended (all uint8_t except flags): flags, refl_type (0-2), elongation (0-15),
  * lidar_status (0-3), lidar_mode (0-9), pkt_version_major/minor (0-255), lidar_type (0-7),
  * is_2nd_return (0-1), multi_return_mode (0-3), use_reflectance (0-1).
@@ -100,7 +97,6 @@ struct EIGEN_ALIGN16 PointEnXYZIT
 {
   PCL_ADD_POINT4D;
   float intensity;
-  uint32_t t_us;  ///< @deprecated Will be removed in v1.0.0. Replaced by `time_stamp`.
   uint32_t time_stamp;
   uint16_t flags;        ///< en_xyzit_flags: which extended fields are valid
   uint8_t refl_type;     ///< 0=normal, 1=ground, 2=fog. When not supported: 0.
@@ -145,17 +141,18 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointXYZIT,
-  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
-    uint32_t, time_stamp, time_stamp))
+  (float, x,
+   x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, time_stamp, time_stamp))
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointEnXYZIT,
-  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, t_us, t_us)(
-    uint32_t, time_stamp, time_stamp)(uint16_t, flags, flags)(uint8_t, refl_type, refl_type)(
-    uint8_t, elongation,
-    elongation)(uint8_t, lidar_status, lidar_status)(uint8_t, lidar_mode, lidar_mode)(
-    uint8_t, pkt_version_major, pkt_version_major)(uint8_t, pkt_version_minor, pkt_version_minor)(
-    uint8_t, lidar_type, lidar_type)(uint8_t, is_2nd_return, is_2nd_return)(
+  (float, x,
+   x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, time_stamp, time_stamp)(
+    uint16_t, flags, flags)(uint8_t, refl_type, refl_type)(uint8_t, elongation, elongation)(
+    uint8_t, lidar_status,
+    lidar_status)(uint8_t, lidar_mode, lidar_mode)(uint8_t, pkt_version_major, pkt_version_major)(
+    uint8_t, pkt_version_minor,
+    pkt_version_minor)(uint8_t, lidar_type, lidar_type)(uint8_t, is_2nd_return, is_2nd_return)(
     uint8_t, multi_return_mode, multi_return_mode)(uint8_t, use_reflectance, use_reflectance))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP
