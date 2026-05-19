@@ -145,6 +145,8 @@ void SeyondPCDDecoder<OutputPointT>::data_packet_parse(
   pkt_lidar_type_ = pkt->common.lidar_type;
   pkt_version_major_ = pkt->common.version.major_version;
   pkt_version_minor_ = pkt->common.version.minor_version;
+  pkt_multi_return_mode_ = static_cast<uint8_t>(pkt->multi_return_mode);
+  pkt_use_reflectance_ = static_cast<uint8_t>(pkt->use_reflectance);
 
   // Robin W: normalize to uint8 range using full-scale 4095 (protocol major <= 3) or 255 (>= 4).
   if (pkt->common.lidar_type == INNO_LIDAR_TYPE_ROBINW) {
@@ -220,6 +222,9 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
       point.pkt_version_major = 0;
       point.pkt_version_minor = 0;
       point.lidar_type = 0;
+      point.is_2nd_return = 0;
+      point.multi_return_mode = 0;
+      point.use_reflectance = 0;
 
       if constexpr (std::is_same<PointType, const InnoXyzPoint *>::value) {
         point.refl_type = static_cast<uint8_t>(point_ptr->type);
@@ -236,6 +241,15 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
 
       point.lidar_type = pkt_lidar_type_;
       point.flags |= fl::HAS_LIDAR_TYPE;
+
+      point.is_2nd_return = static_cast<uint8_t>(point_ptr->is_2nd_return);
+      point.flags |= fl::HAS_IS_2ND_RETURN;
+
+      point.multi_return_mode = pkt_multi_return_mode_;
+      point.flags |= fl::HAS_MULTI_RETURN_MODE;
+
+      point.use_reflectance = pkt_use_reflectance_;
+      point.flags |= fl::HAS_USE_REFLECTANCE;
     }
 
     // Apply coordinate transformation (Autoware coordinate system)

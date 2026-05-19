@@ -196,7 +196,7 @@ The output bag file contains `sensor_msgs::msg::PointCloud2` messages on topics 
 - `t_us` (uint32): Relative timestamp in microseconds from the scan start time (xyzit, en_xyzit only). **Will be removed in v1.0.0**; use `time_stamp` instead.
 - `time_stamp` (uint32): Relative timestamp in nanoseconds from the scan start time (xyzit, en_xyzit only)
 
-**Extended fields** (en_xyzit only): availability mask, refl_type, elongation, lidar_status, lidar_mode, packet version, and lidar_type. Full layout, flag semantics, and value tables are in [docs/en_xyzit.md](docs/en_xyzit.md).
+**Extended fields** (en_xyzit only): availability mask, refl_type, elongation, lidar_status, lidar_mode, packet version, lidar_type, is_2nd_return, multi_return_mode, and use_reflectance. Full layout, flag semantics, and value tables are in [docs/en_xyzit.md](docs/en_xyzit.md).
 
 #### Timestamps
 
