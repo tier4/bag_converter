@@ -17,7 +17,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <algorithm>
-#include <cmath>
 #include <cstring>
 #include <type_traits>
 
@@ -186,7 +185,7 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
 
     OutputPointT point;
 
-    // Set intensity based on point type and configuration (float pipeline, then uint8 storage)
+    // Set intensity based on point type and configuration (float pipeline, stored as float)
     float intensity_value = 0.0F;
     if constexpr (std::is_same<PointType, const InnoEnXyzPoint *>::value) {
       intensity_value = is_use_refl ? static_cast<float>(point_ptr->reflectance)
@@ -198,8 +197,7 @@ void SeyondPCDDecoder<OutputPointT>::point_xyz_data_parse(
     if (robin_w_intensity_scale_ > 0.0F) {
       intensity_value *= robin_w_intensity_scale_;
     }
-    point.intensity =
-      static_cast<std::uint8_t>(std::lround(std::clamp(intensity_value, 0.0F, 255.0F)));
+    point.intensity = std::clamp(intensity_value, 0.0F, 255.0F);
 
     // Set timestamp (relative time from scan start)
     // point_ptr->ts_10us is relative to the packet's ts_start_us (in 10us units)
