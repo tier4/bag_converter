@@ -198,7 +198,7 @@ Examples:
     )
 
     parser.add_argument('bag_path', type=str, help='Path to the rosbag2 file')
-    parser.add_argument('field', type=str, help='PointCloud2 field name to plot (e.g., intensity, x, t_us)')
+    parser.add_argument('field', type=str, help='PointCloud2 field name to plot (e.g., intensity, x, time_stamp)')
 
     parser.add_argument('--bins', type=int, default=50, help='Number of bins (default: 50)')
 

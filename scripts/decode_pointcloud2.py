@@ -7,7 +7,7 @@ and reading all available fields. It supports:
 - Reading PointCloud2 messages from rosbag2 files
 - Automatic field detection and decoding
 - Displaying point data with configurable number of points per message
-- Handling relative timestamps (e.g., t_us field) and calculating absolute timestamps
+- Handling relative timestamps (e.g., time_stamp field) and calculating absolute timestamps
 """
 
 import argparse
@@ -120,10 +120,10 @@ def decode_pointcloud2(bag_path: str, point_step: int = 10000, delay: float | No
                     if num_points == 0:
                         continue
 
-                    # Calculate base timestamp in microseconds (if t_us field exists)
-                    base_time_us = None
-                    if 't_us' in points and len(points['t_us']) > 0:
-                        base_time_us = msg.header.stamp.sec * 1_000_000 + msg.header.stamp.nanosec // 1_000
+                    # Calculate base timestamp in nanoseconds (if time_stamp field exists)
+                    base_time_ns = None
+                    if 'time_stamp' in points and len(points['time_stamp']) > 0:
+                        base_time_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
 
                     # Convert timestamp from nanoseconds to seconds and nanoseconds
                     received_sec = timestamp // 1_000_000_000
@@ -148,12 +148,12 @@ def decode_pointcloud2(bag_path: str, point_step: int = 10000, delay: float | No
                         for field_name in field_names:
                             field_data = points[field_name]
                             if len(field_data) > i:
-                                if field_name == 't_us' and base_time_us is not None:
-                                    # Calculate absolute timestamp for t_us
-                                    abs_time_us = base_time_us + int(field_data[i])
-                                    abs_time_sec = abs_time_us / 1_000_000.0
-                                    stamp_str = f"stamp={abs_time_sec:.6f}"
-                                    # Add t_us as a regular field
+                                if field_name == 'time_stamp' and base_time_ns is not None:
+                                    # Calculate absolute timestamp for time_stamp (nanoseconds)
+                                    abs_time_ns = base_time_ns + int(field_data[i])
+                                    abs_time_sec = abs_time_ns / 1_000_000_000.0
+                                    stamp_str = f"stamp={abs_time_sec:.9f}"
+                                    # Add time_stamp as a regular field
                                     point_info_parts.append(f"{field_name}={field_data[i]}")
                                 elif field_name == 'intensity' and isinstance(field_data[i], (float, np.floating)):
                                     point_info_parts.append(f"{field_name}={field_data[i]:.1f}")
@@ -235,8 +235,8 @@ def decode_point(msg: PointCloud2) -> dict:
 
     Note:
         msg.header.stamp represents the scan start timestamp (absolute time).
-        If a field named 't_us' exists, it contains relative timestamps from
-        the scan start in microseconds.
+        If a field named 'time_stamp' exists, it contains relative timestamps
+        from the scan start in nanoseconds.
 
     Args:
         msg: PointCloud2 message (msg.header.stamp is the scan start timestamp)
