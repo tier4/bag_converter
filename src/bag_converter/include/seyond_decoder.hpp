@@ -104,6 +104,10 @@ private:
   uint8_t pkt_version_major_;
   uint8_t pkt_version_minor_;
 
+  // Per-packet mode flags (experimental, en_xyzit only)
+  uint8_t pkt_multi_return_mode_;  // enum InnoMultipleReturnMode (0-3)
+  uint8_t pkt_use_reflectance_;    // 0=intensity mode, 1=reflectance mode
+
   // Robin W: map raw intensity/reflectance to [0, 255] using full-scale 4095 (major <= 3) or
   // 255 (major >= 4). Zero means "not Robin W" (pass raw through). Same for reflectance and
   // intensity field selection in InnoEnXyzPoint, and InnoXyzPoint::refl.
