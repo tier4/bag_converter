@@ -141,17 +141,18 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointXYZIT,
-  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(
-    uint32_t, time_stamp, time_stamp))
+  (float, x,
+   x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, time_stamp, time_stamp))
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
   bag_converter::point::PointEnXYZIT,
-  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(
-    uint32_t, time_stamp, time_stamp)(uint16_t, flags, flags)(uint8_t, refl_type, refl_type)(
-    uint8_t, elongation,
-    elongation)(uint8_t, lidar_status, lidar_status)(uint8_t, lidar_mode, lidar_mode)(
-    uint8_t, pkt_version_major, pkt_version_major)(uint8_t, pkt_version_minor, pkt_version_minor)(
-    uint8_t, lidar_type, lidar_type)(uint8_t, is_2nd_return, is_2nd_return)(
+  (float, x,
+   x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint32_t, time_stamp, time_stamp)(
+    uint16_t, flags, flags)(uint8_t, refl_type, refl_type)(uint8_t, elongation, elongation)(
+    uint8_t, lidar_status,
+    lidar_status)(uint8_t, lidar_mode, lidar_mode)(uint8_t, pkt_version_major, pkt_version_major)(
+    uint8_t, pkt_version_minor,
+    pkt_version_minor)(uint8_t, lidar_type, lidar_type)(uint8_t, is_2nd_return, is_2nd_return)(
     uint8_t, multi_return_mode, multi_return_mode)(uint8_t, use_reflectance, use_reflectance))
 
 #endif  // BAG_CONVERTER__POINT_TYPES_HPP
