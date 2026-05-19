@@ -76,6 +76,7 @@ If the input path is a directory, all bag files (`.mcap`, `.db3`, `.sqlite3`) in
 | `--min-range <value>`              | Minimum range in meters (default: `0.1`)                                                                                                                                                                                               |
 | `--max-range <value>`              | Maximum range in meters (default: `250.0`)                                                                                                                                                                                             |
 | `--point-type <type>`              | Output point type: `xyzit` (default), `xyzi`, or `en_xyzit`. For `en_xyzit` layout and extended fields, see [docs/en_xyzit.md](docs/en_xyzit.md).                                                                                      |
+| `--no-intensity-scaling`           | Emit the raw intensity/reflectance value from the sensor packet without normalizing to `[0, 255]`. Seyond decoder only; no effect for Nebula. See [docs/seyond_intensity_scaling.md](docs/seyond_intensity_scaling.md).                |
 | `--keep-original`                  | Keep original packet topics in output bag (default: off)                                                                                                                                                                               |
 | `--timescale-correction <on\|off>` | Enable/disable timescale correction (default: `on`)                                                                                                                                                                                    |
 | `--timescale-correction-ref <ref>` | Rosbag recording timescale: `utc` (default), `tai`, or `gps`                                                                                                                                                                           |
@@ -192,7 +193,7 @@ The output bag file contains `sensor_msgs::msg::PointCloud2` messages on topics 
 - `x` (float32): X coordinate in meters
 - `y` (float32): Y coordinate in meters
 - `z` (float32): Z coordinate in meters
-- `intensity` (float32): Intensity value in [0, 255]. Robin W uses packet-version-dependent scaling; see [docs/seyond_intensity_scaling.md](docs/seyond_intensity_scaling.md).
+- `intensity` (float32): Intensity value in [0, 255] by default. Robin W uses packet-version-dependent scaling; see [docs/seyond_intensity_scaling.md](docs/seyond_intensity_scaling.md). Use `--no-intensity-scaling` to emit the raw sensor value instead.
 - `time_stamp` (uint32): Relative timestamp in nanoseconds from the scan start time (xyzit, en_xyzit only)
 
 **Extended fields** (en_xyzit only): availability mask, refl_type, elongation, lidar_status, lidar_mode, packet version, lidar_type, is_2nd_return, multi_return_mode, and use_reflectance. Full layout, flag semantics, and value tables are in [docs/en_xyzit.md](docs/en_xyzit.md).

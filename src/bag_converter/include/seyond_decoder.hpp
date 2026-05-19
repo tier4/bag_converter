@@ -45,6 +45,9 @@ inline constexpr size_t initial_points_capacity =
 // Configuration for the decoder
 struct SeyondPCDDecoderConfig : public BasePCDDecoderConfig
 {
+  // When true, the decoder writes the raw intensity/reflectance value from the
+  // sensor packet without Robin W normalization or the [0, 255] clamp.
+  bool no_intensity_scaling = false;
 };
 
 /**
